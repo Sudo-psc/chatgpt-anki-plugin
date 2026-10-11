@@ -8,12 +8,15 @@ function challengeFor(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
+const TEST_SIGNING_SECRET = 'unit-signing-secret-0123456789abcdef';
+
 function service(overrides: Partial<ConstructorParameters<typeof OAuthService>[0]> = {}): OAuthService {
   return new OAuthService({
     allowedRedirectUris: [ALLOWED, 'http://localhost:3000/callback'],
     defaultScopes: ['anki:read', 'anki:write', 'anki:review'],
     allowDcr: true,
     now: () => 1_700_000_000_000,
+    signingSecret: TEST_SIGNING_SECRET,
     envClient: { clientId: 'chatgpt', redirectUris: [ALLOWED, 'http://localhost:3000/callback'] },
     ...overrides,
   });
@@ -199,7 +202,7 @@ describe('OAuthService dynamic client registration', () => {
   it('registers an allowlisted client', () => {
     const svc = service();
     const client = svc.registerClient({ redirect_uris: [ALLOWED], client_name: 'ChatGPT' });
-    expect(client.clientId).toMatch(/^mcp-/);
+    expect(client.clientId).toMatch(/^mcp_/);
     expect(svc.getClient(client.clientId)?.clientName).toBe('ChatGPT');
   });
 
@@ -214,6 +217,27 @@ describe('OAuthService dynamic client registration', () => {
     // Registro sem redirect_uris também é aceito (o conector pode operar com callback padrão):
     const noRedirects = svc.registerClient({});
     expect(noRedirects.redirectUris).toEqual([]);
+  });
+
+  it('signed client ids survive restarts: reconstructed without any server state', () => {
+    const first = service();
+    const client = first.registerClient({ redirect_uris: [ALLOWED], client_name: 'ChatGPT' });
+
+    // "Novo processo" (memória zerada): o client é reconstruído pela assinatura.
+    const restarted = service();
+    const restored = restarted.getClient(client.clientId);
+    expect(restored).toBeDefined();
+    expect(restored?.redirectUris).toEqual([ALLOWED]);
+    expect(restored?.clientName).toBe('ChatGPT');
+    expect(restored?.dynamic).toBe(true);
+
+    // Assinatura adulterada é rejeitada.
+    const tampered = `${client.clientId.slice(0, -4)}AAAA`;
+    expect(restarted.getClient(tampered)).toBeUndefined();
+
+    // Segredo diferente (outra instalação) rejeita o id.
+    const otherSecret = service({ signingSecret: 'another-signing-secret-0123456789ab' });
+    expect(otherSecret.getClient(client.clientId)).toBeUndefined();
   });
 
   it('dynamic clients accept ChatGPT-hosted redirects at authorize; env client stays strict', () => {

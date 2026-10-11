@@ -35,6 +35,7 @@ async function main(): Promise<void> {
     allowedRedirectUris: config.auth.allowedRedirectUris,
     defaultScopes: config.auth.defaultScopes,
     allowDcr: config.auth.allowDcr,
+    signingSecret: config.auth.tokenSecret,
     envClient: {
       clientId: config.auth.clientId,
       ...(config.auth.clientSecret ? { clientSecret: config.auth.clientSecret } : {}),

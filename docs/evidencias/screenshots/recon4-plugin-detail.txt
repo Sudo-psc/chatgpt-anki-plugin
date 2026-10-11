@@ -1,0 +1,173 @@
+URL: https://chatgpt.com/plugins/plugin_asdk_app_6acafe0bfe30819180cc0183ecdf3de1
+
+BUTTONS:
+Início
+Espaço
+Agendado
+Plugins
+Explorar
+Projetos
+Sites
+Mapas
+Figma
+Adobe
+Imagens
+Testar no chat
+Anki (chatgpt-anki-plugin)Consulta, cria, edita, pesquisa e revisa flashcards do Anki via AnkiConnect (servidor MCP próprio).Conectar
+Conectar
+
+LINKS(não-vazios):
+Pular para o conteúdo
+Plugins
+Habilidades
+Anki (chatgpt-anki-plugin)
+AnkiWeb pelo Navegador
+Writing Style
+Plugin Creator
+CoinGecko
+TinyFish
+TIM Brasil
+Hostinger Mail
+Stripe
+Zotero
+Vercel
+Agentic Search by Liner
+SubscriptionFlow
+Context7
+Research
+Research Methodology
+Research & Writing Copilot
+Research Writing Guardrails
+Research Assistant
+Research Evidence Finder
+TextExpander
+Taplio
+Supermemory
+Remote Desktop Commander
+alphaXiv
+Healthcare Public Data
+AMD
+MotionDesign
+Google Contacts
+Slack
+Ocoya
+1Password
+omi
+Life Sciences Databases
+Life Sciences Literature
+Caveman Mode
+ChatGPT Ads Manager
+AgentMail
+Google Calendar
+Open Design
+Google Drive
+to3D
+Wiley Scholar Gateway
+Flipbook - Publuu
+Keystone
+Higgsfield
+LinkedIn
+AI Business Plan by PrometAI
+Prompt Perfect
+Whimsical
+Todoist: To Do List & Calendar
+Newsify
+Product Hunt
+Outlook Email
+OpenAI Developers
+Scholar Sidekick
+SciSpace
+
+BODY (últimos 2000):
+y
+Build iOS Apps
+Build Web Data Visualization
+Build macOS Apps
+Life Science Research
+Build Web Apps
+Remotion
+HyperFrames by HeyGen
+Gmail
+Mobbin
+Academic Writing Toolkit
+Amass
+AnyQR
+Tripadvisor
+Canvs.io whiteboard
+AI Voice Generator
+WeatherPromise
+GetYourGuide
+Buson
+PandaFind
+Zen Shopping
+Shopee
+Malwarebytes
+Buser
+AbhiBus
+Resume Builder
+Indeed Job Search
+Course Studio
+Ace Knowledge Graph
+OKX
+Mermaid Chart
+Elicit
+Investment Banking
+Public Equity Investing
+Product Design
+Creative Production
+Data
+Financial Datasets
+CryptoAudit
+Serasa
+Binance
+Context7
+Assessment Generator
+Klook
+QuintoAndar
+Decolar
+CALL-E
+Awesome Slides
+Wayground
+Speechify
+Strive PDF Generator
+Sider Recorder & Transcriber
+Skyscanner
+Hugging Face
+Genspark AI Slides
+Manus
+Semrush
+Flixor
+Adobe Acrobat
+Coursera Learning
+Booking.com
+Adobe
+Airtable
+Apple Music
+Canva
+Figma
+GitHub
+Plugins
+Anki (chatgpt-anki-plugin)
+Anki (chatgpt-anki-plugin)
+Por App developer
+Gerenciar
+Testar no chat
+
+Consulta, cria, edita, pesquisa e revisa flashcards do Anki via AnkiConnect (servidor MCP próprio).
+
+Aplicativos
+1
+Anki (chatgpt-anki-plugin)
+Consulta, cria, edita, pesquisa e revisa flashcards do Anki via AnkiConnect (servidor MCP próprio).
+Conectar
+Informações
+Desenvolvedor
+App developer
+Categoria
+Other
+Versão
+1.0.0
+Site
+Indisponível
+
+Quando conectado a Anki (chatgpt-anki-plugin), o ChatGPT pode compartilhar chats e memórias relevantes com este aplicativo para ajudar a contextualizar suas solicitações. O uso desses dados pelo Anki (chatgpt-anki-plugin) está sujeito aos termos e à política de privacidade dele. Se a Memória estiver ativada, dados do aplicativo poderão ser usados para fornecer proativamente informações ou sugestões úteis. O ChatGPT sempre respeita suas preferências sobre o uso de dados para treinamento, inclusive para dados de aplicativos conectados. O uso de aplicativos pode envolver risco elevado. Você pode gerenciar suas preferências ou se desconectar de aplicativos a qualquer momento nas configurações. Saiba mais

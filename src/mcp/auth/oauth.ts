@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { TOOL_SCOPES } from '../../tools/types.js';
 
 /**
@@ -101,6 +101,12 @@ export interface OAuthServiceOptions {
   codeTtlMs?: number;
   now?: () => number;
   envClient?: { clientId: string; clientSecret?: string; redirectUris: string[] };
+  /**
+   * Chave HMAC para assinar client ids auto-contidos emitidos pelo DCR.
+   * Em produção, use o TOKEN_SECRET (o registro sobrevive a restart/cold start
+   * e a múltiplas instâncias — nada de estado em memória para clientes).
+   */
+  signingSecret?: string;
 }
 
 export class OAuthService {
@@ -108,10 +114,12 @@ export class OAuthService {
   private readonly codes = new Map<string, AuthorizationCodeRecord>();
   private readonly now: () => number;
   private readonly options: OAuthServiceOptions;
+  private readonly signingSecret: string;
 
   constructor(options: OAuthServiceOptions) {
     this.options = options;
     this.now = options.now ?? Date.now;
+    this.signingSecret = options.signingSecret ?? 'dev-client-signing-secret-0123456789abcdef';
     if (options.envClient) {
       const { clientId, clientSecret, redirectUris } = options.envClient;
       this.clients.set(clientId, {
@@ -150,7 +158,12 @@ export class OAuthService {
         );
       }
     }
-    const clientId = `mcp-${randomBytes(12).toString('hex')}`;
+    const clientId = this.signClientPayload({
+      v: 1,
+      ...(typeof input.client_name === 'string' ? { name: input.client_name } : {}),
+      redirect_uris: redirectUris,
+      iat: this.now(),
+    });
     const record: OAuthClientRecord = {
       clientId,
       ...(typeof input.client_name === 'string' ? { clientName: input.client_name } : {}),
@@ -164,7 +177,51 @@ export class OAuthService {
   }
 
   getClient(clientId: string | undefined): OAuthClientRecord | undefined {
-    return clientId ? this.clients.get(clientId) : undefined;
+    if (!clientId) return undefined;
+    const cached = this.clients.get(clientId);
+    if (cached) return cached;
+    const restored = this.parseSignedClientId(clientId);
+    if (restored) this.clients.set(clientId, restored);
+    return restored;
+  }
+
+  /** Client ids do DCR são auto-contidos e assinados: sobrevivem a restart/cold start. */
+  private signClientPayload(payload: Record<string, unknown>): string {
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signature = createHmac('sha256', this.signingSecret).update(body).digest('base64url');
+    return `mcp_${body}.${signature}`;
+  }
+
+  private parseSignedClientId(clientId: string): OAuthClientRecord | undefined {
+    if (!clientId.startsWith('mcp_')) return undefined;
+    const separator = clientId.indexOf('.', 4);
+    if (separator === -1) return undefined;
+    const body = clientId.slice(4, separator);
+    const signature = clientId.slice(separator + 1);
+    const expected = createHmac('sha256', this.signingSecret).update(body).digest();
+    const provided = Buffer.from(signature, 'base64url');
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return undefined;
+    try {
+      const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as {
+        v?: number;
+        name?: string;
+        redirect_uris?: string[];
+        iat?: number;
+      };
+      if (payload.v !== 1) return undefined;
+      return {
+        clientId,
+        ...(typeof payload.name === 'string' ? { clientName: payload.name } : {}),
+        redirectUris: Array.isArray(payload.redirect_uris)
+          ? payload.redirect_uris.filter((uri): uri is string => typeof uri === 'string')
+          : [],
+        tokenEndpointAuthMethod: 'none',
+        createdAt: typeof payload.iat === 'number' ? payload.iat : Date.now(),
+        dynamic: true,
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   validateAuthorize(params: AuthorizeParams): AuthorizeValidation {

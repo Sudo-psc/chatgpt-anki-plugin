@@ -38,6 +38,7 @@ const ctx = await chromium.launchPersistentContext(PROFILE, {
 });
 
 // Aprova automaticamente o consentimento OAuth do NOSSO servidor (popup ou aba).
+let consentApproved = false;
 ctx.on('page', (p) => {
   void (async () => {
     try {
@@ -45,6 +46,7 @@ ctx.on('page', (p) => {
       if (p.url().includes('/oauth/authorize')) {
         log('página de consentimento OAuth detectada — aprovando...');
         await p.getByRole('button', { name: /Autorizar/i }).click({ timeout: 15000 });
+        consentApproved = true;
         log('consentimento aprovado.');
       }
     } catch (err) {
@@ -365,6 +367,95 @@ if (PHASE === 'connector2') {
     await shot(done ? 'c10-05-connector-criado.png' : 'c10-05-connector-pendente.png');
     log(done ? 'CONNECTOR CRIADO (aparece em Instalados).' : 'não confirmei a criação — verifique a janela.');
     process.exitCode = done ? 0 : 3;
+  }
+  await ctx.close();
+  process.exit(process.exitCode ?? 0);
+}
+
+if (PHASE === 'connect') {
+  await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' });
+  if (!(await waitForLoggedIn(60 * 1000))) {
+    log('não está logado — rode a fase login primeiro.');
+    process.exitCode = 2;
+  } else {
+    const connectorUrl =
+      process.env.CONNECTOR_URL ?? 'https://chatgpt.com/plugins/plugin_asdk_app_6acafe0bfe30819180cc0183ecdf3de1';
+    await page.goto(connectorUrl, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await sleep(7000);
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    if (!/anki \(chatgpt-anki-plugin\)/i.test(bodyText)) {
+      await page.goto('https://chatgpt.com/plugins', { waitUntil: 'domcontentloaded' });
+      await sleep(3500);
+      await page.getByText('Anki (chatgpt-anki-plugin)', { exact: true }).first().click({ timeout: 8000 }).catch((e) => log(`clique no plugin: ${e.message}`));
+      await sleep(8000);
+    }
+    await shot('c10-06-plugin-aberto.png');
+
+    const connectBtn = page.getByRole('button', { name: /^conectar$/i }).first();
+    if (await connectBtn.isVisible({ timeout: 6000 }).catch(() => false)) {
+      await connectBtn.click().catch((e) => log(`Conectar: ${e.message}`));
+      log('cliquei "Conectar".');
+      await sleep(2500);
+    } else {
+      log('botão "Conectar" não visível — possivelmente já conectado; seguindo.');
+    }
+    // Polling tolerante: o modal de consentimento do ChatGPT pode demorar a renderizar.
+    const modalDeadline = Date.now() + 2 * 60 * 1000;
+    let continuarClicked = false;
+    while (Date.now() < modalDeadline && !consentApproved) {
+      if (!continuarClicked) {
+        const continuarBtn = page.getByRole('button', { name: /continuar em anki/i }).first();
+        if (await continuarBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+          await shot('c10-06b-consent-modal.png');
+          await continuarBtn.click().catch(() => {});
+          continuarClicked = true;
+          log('cliquei "Continuar em Anki" (consentimento do ChatGPT).');
+        }
+      }
+      if (page.url().includes('/oauth/authorize')) {
+        await page.getByRole('button', { name: /autorizar/i }).click({ timeout: 5000 }).catch(() => {});
+        consentApproved = true;
+      }
+      await sleep(2000);
+    }
+
+    // Espera o consentimento OAuth (popup) — até 2 minutos.
+    const deadline = Date.now() + 2 * 60 * 1000;
+    while (Date.now() < deadline && !consentApproved) {
+      await sleep(2000);
+    }
+    if (consentApproved) {
+      log('OAuth aprovado — aguardando troca de token/atualização da UI...');
+      await sleep(8000);
+    }
+    await shot(consentApproved ? 'c10-07-conectado.png' : 'c10-07-conexao-pendente.png');
+    log(consentApproved ? 'CONEXÃO OK (fluxo OAuth completo).' : 'conexão não completou — verifique a janela.');
+    process.exitCode = consentApproved ? 0 : 3;
+  }
+  await ctx.close();
+  process.exit(process.exitCode ?? 0);
+}
+
+if (PHASE === 'recon4') {
+  await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' });
+  if (!(await waitForLoggedIn(60 * 1000))) {
+    log('não está logado — rode a fase login primeiro.');
+    process.exitCode = 2;
+  } else {
+    await page.goto('https://chatgpt.com/plugins', { waitUntil: 'domcontentloaded' });
+    await sleep(3500);
+    await page.getByText('Anki (chatgpt-anki-plugin)', { exact: true }).first().click({ timeout: 8000 }).catch((e) => log(`clique: ${e.message}`));
+    await sleep(9000); // deixa a página de detalhe carregar por completo
+    await shot('recon4-plugin-detail.png');
+    const buttons = await page.getByRole('button').allTextContents().catch(() => []);
+    const links = await page.getByRole('link').allTextContents().catch(() => []);
+    const body = await page.locator('body').innerText().catch(() => '');
+    writeFileSync(
+      path.join(SHOTS, 'recon4-plugin-detail.txt'),
+      `URL: ${page.url()}\n\nBUTTONS:\n${buttons.filter(Boolean).join('\n')}\n\nLINKS(não-vazios):\n${links.filter((l) => l.trim()).slice(0, 60).join('\n')}\n\nBODY (últimos 2000):\n${body.slice(-2000)}`,
+      'utf8',
+    );
+    log('recon4 salvo em docs/evidencias/screenshots/recon4-plugin-detail.{png,txt}');
   }
   await ctx.close();
   process.exit(process.exitCode ?? 0);

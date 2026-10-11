@@ -50,6 +50,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestAp
     allowedRedirectUris: config.auth.allowedRedirectUris,
     defaultScopes: config.auth.defaultScopes,
     allowDcr: config.auth.allowDcr,
+    signingSecret: TEST_TOKEN_SECRET,
     envClient: {
       clientId: config.auth.clientId,
       redirectUris: config.auth.allowedRedirectUris,

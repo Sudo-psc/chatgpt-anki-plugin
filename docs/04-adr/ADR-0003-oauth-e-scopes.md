@@ -42,7 +42,16 @@ validação de `aud` (RFC 8707). O ChatGPT (connector) descobre o fluxo via 401 
 
 ## Consequências
 
-- Rotação de `TOKEN_SECRET` invalida todos os tokens (runbook cobre).
+- **Client ids do DCR são auto-contidos e assinados (HMAC com o `TOKEN_SECRET`)**:
+  o registro sobrevive a restart/cold start e a múltiplas instâncias — nada de
+  estado em memória para clientes (achado em produção: com `auto_stop`, o
+  client registrado se perdia e o `/oauth/authorize` respondia `Unknown
+  client_id`). Os **authorization codes** (TTL 60 s) seguem em memória;
+  `auto_stop_machines = 'suspend'` preserva-os no idle e o fluxo real dura
+  segundos (documentado no runbook).
+- Rotação de `TOKEN_SECRET` invalida todos os tokens **e os client ids
+  assinados** — o ChatGPT re-registra automaticamente no próximo fluxo
+  (runbook cobre os efeitos).
 - O consentimento mostra os escopos em pt-BR; negação redireciona
   `error=access_denied`.
 - Testes: `tests/integration/auth.test.ts` (15) cobrem o fluxo completo,

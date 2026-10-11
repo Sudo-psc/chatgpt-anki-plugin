@@ -227,7 +227,7 @@ describe('MCP endpoint authentication (C7)', () => {
     });
     expect(register.status).toBe(201);
     const client = (await register.json()) as { client_id: string };
-    expect(client.client_id).toMatch(/^mcp-/);
+    expect(client.client_id).toMatch(/^mcp_/);
 
     const token = await obtainToken(app.baseUrl, {
       clientId: client.client_id,

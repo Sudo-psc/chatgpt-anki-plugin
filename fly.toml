@@ -28,7 +28,8 @@ primary_region = 'gru'
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'stop'
+  # 'suspend' preserva a memória no idle (códigos OAuth de 60s sobrevivem ao cold start).
+  auto_stop_machines = 'suspend'
   auto_start_machines = true
   min_machines_running = 0
 
