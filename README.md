@@ -28,6 +28,13 @@ dados ficando no **seu** Anki.
 `manage_tags`, `update_model_templates`.
 Contratos completos: [`docs/05-tools-mcp.md`](docs/05-tools-mcp.md).
 
+## Demo pública (dados sintéticos)
+
+Instância de demonstração com OAuth ativo e coleção **100% sintética** — use no
+ChatGPT (developer mode) ou nos testes:
+
+**`https://chatgpt-anki-mcp-sudo.fly.dev/mcp`** · `curl https://chatgpt-anki-mcp-sudo.fly.dev/health`
+
 ## Quickstart (demo em ~2 minutos)
 
 Pré-requisito: Docker com Compose. Modo demo usa uma **coleção 100% sintética**

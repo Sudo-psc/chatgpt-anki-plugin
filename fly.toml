@@ -8,6 +8,11 @@
 # da OpenAI e ao developer mode do ChatGPT). Para uso pessoal real, troque para o
 # backend connect apontando ANKI_CONNECT_URL ao seu AnkiConnect via túnel privado:
 #   fly secrets set ANKI_BACKEND=connect ANKI_CONNECT_URL=https://<tunel> ANKI_CONNECT_API_KEY=...
+#
+# LIMITAÇÃO DE ESCALA: códigos OAuth, clientes DCR e rate limit vivem em MEMÓRIA
+# do processo — mantenha UMA machine (fly scale count 1; já aplicado). Com 2+
+# machines sem sticky sessions, o token exchange pode cair em outra instância e
+# falhar com invalid_grant. Store compartilhado: roadmap R-03 (ADR-0007).
 app = 'chatgpt-anki-mcp-sudo'
 primary_region = 'gru'
 

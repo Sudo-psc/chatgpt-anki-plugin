@@ -11,11 +11,11 @@ oficial:
 |:---|:---|:---|:---|
 | P1 | Organização verificada na OpenAI Platform (individual ou business) | Dashboard → Settings → Verification | ⬜ requer conta do proprietário |
 | P2 | Papel **Owner** (ou `api.apps.write`) na org | Dashboard | ⬜ |
-| P3 | MCP server em domínio **público HTTPS** (sem endpoint local) | `fly deploy` (runbook §1) | ⬜ requer FLY_API_TOKEN |
+| P3 | MCP server em domínio **público HTTPS** (sem endpoint local) | `fly deploy` (runbook §1) | ✅ https://chatgpt-anki-mcp-sudo.fly.dev/mcp (evidência C9) |
 | P4 | Política de privacidade **publicada** com URL | `docs/legal/politica-de-privacidade.md` → GitHub Pages `/legal/` | ⬜ habilitar Pages |
 | P5 | Termos de uso publicados | `docs/legal/termos-de-uso.md` | ⬜ idem |
 | P6 | CSP definida para os domínios exatos usados | string em §5 | ✅ definida no servidor (header) |
-| P7 | Conta de demonstração para a revisão (apps autenticados) | modo `mock` (§4) | ✅ endpoint pronto no modo demo |
+| P7 | Conta de demonstração para a revisão (apps autenticados) | modo `mock` (§4) | ✅ instância pública em modo mock (dados sintéticos) com OAuth testado E2E |
 
 > **Nota (ADR-0008):** a listagem pública ampla depende do roadmap multi-tenant
 > (T-048). A submissão inicial pode ocorrer com o modelo self-host documentado;
@@ -49,7 +49,11 @@ oficial:
 
 ## 4. Conta de demonstração (modo mock)
 
-A revisão da OpenAI exige um ambiente funcional. Sirva uma instância com:
+A revisão da OpenAI exige um ambiente funcional. **Instância de demonstração já
+publicada:** `https://chatgpt-anki-mcp-sudo.fly.dev/mcp` (Fly `gru`, 1 machine,
+OAuth ativo, dados 100% sintéticos; evidência em `docs/evidencias/C9-deploy.md`).
+
+Configuração da demo (referência p/ recriar):
 
 ```
 ANKI_BACKEND=mock

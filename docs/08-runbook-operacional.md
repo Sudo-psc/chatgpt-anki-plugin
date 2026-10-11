@@ -22,6 +22,12 @@ curl -fsS https://chatgpt-anki-mcp.fly.dev/health   # {"status":"ok",...}
 > túnel privado (Tailscale/cloudflared) ou rode a instância na sua máquina e
 > use o Fly apenas como proxy TLS. **Nunca** exponha o AnkiConnect à Internet
 > aberta sem `apiKey` (ver ADR-0001).
+>
+> **Escala — obrigatório 1 machine:** códigos OAuth, clientes DCR e rate limit
+> são em memória por instância (ADR-0007). Com 2+ machines sem sticky sessions,
+> o `code` emitido em uma instância pode ser trocado em outra ⇒ `invalid_grant`
+> (observado no deploy inicial). Mantenha `fly scale count 1`; store
+> compartilhado é o roadmap R-03.
 
 ### 1.2 Docker Compose (self-host)
 

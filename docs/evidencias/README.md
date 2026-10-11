@@ -14,7 +14,7 @@ regeneráveis via os comandos indicados; evidências externas exigem conta
 | C6 | JSON Schema validado + erros tipados | `tests/contract` (7 testes, output real × schema) | `npm run test:contract` |
 | C7 | OAuth 2.1+PKCE+scopes; 401 p/ token inválido | `tests/integration/auth.test.ts` (15 testes) | `npm test` |
 | C8 | Cobertura ≥80% + CI verde | `coverage/` + badge Actions | `npm run test:coverage` |
-| C9 | MCP público HTTPS + healthcheck 200 | `curl https://<host>/health` | após T-045 (⛔ FLY_API_TOKEN) |
+| C9 | MCP público HTTPS + healthcheck 200 | [`C9-deploy.md`](./C9-deploy.md) — https://chatgpt-anki-mcp-sudo.fly.dev (`/health` 200; E2E OAuth+tools OK) | `curl https://chatgpt-anki-mcp-sudo.fly.dev/health` |
 | C10 | Developer mode com as tools invocáveis | `C10-developer-mode.md` (transcrição) | roteiro em `09-*` §7 (⛔ conta ChatGPT) |
 | C11 | Submissão enviada | comprovante do portal | `09-*` §8 (⛔ conta OpenAI) |
 | C12 | App aprovado/publicado | link no diretório | (⛔ revisão humana) |
@@ -24,10 +24,10 @@ regeneráveis via os comandos indicados; evidências externas exigem conta
 
 ## Status atual (2026-10-10)
 
-- **Verdes:** C1 (repo público + proteção + Pages), C2, C3, C4, C5, C6, C7, C8,
-  C14, C15 (CI local: lint+typecheck+122 testes+coverage+build; gitleaks no CI).
+- **Verdes:** C1, **C9** (deploy público Fly + E2E público), C2, C3, C4, C5, C6,
+  C7, C8, C14, C15 (CI local: lint+typecheck+122 testes+coverage+build; gitleaks no CI).
 - **Parciais:** C13 (quickstart medido no smoke; formulário de usabilidade com
   terceiro pendente).
-- **Bloqueados externamente:** C9, C10, C11, C12 — requerem credenciais/contas
-  do proprietário (FLY_API_TOKEN, conta OpenAI, sessão ChatGPT). Todos os
-  pacotes preparatórios estão prontos.
+- **Bloqueados externamente:** C10 (sessão ChatGPT para developer mode —
+  endpoint público já pronto e testado), C11, C12 (conta OpenAI verificada +
+  revisão humana). Pacotes preparatórios 100% prontos (`docs/09-*`).

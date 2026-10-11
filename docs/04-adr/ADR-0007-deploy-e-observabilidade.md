@@ -43,6 +43,11 @@ self-hosted (Docker Compose) para quem não quer terceiros.
 
 ## Consequências
 
+- **Escala = 1 machine por padrão**: códigos OAuth, clientes DCR e rate limit
+  são em memória por instância; com 2+ machines sem sticky sessions o token
+  exchange pode falhar com `invalid_grant` (observado no deploy inicial do
+  app `chatgpt-anki-mcp-sudo`, corrigido com `fly scale count 1`). Store
+  compartilhado (Redis) está no roadmap R-03 e é pré-requisito para escalar.
 - Rollback = `fly releases` + `fly deploy --image` (runbook) ou redeploy da tag
   anterior (imagens versionadas no ghcr).
 - Segredos de runtime (`TOKEN_SECRET`, `ANKI_CONNECT_API_KEY`) nunca na imagem;

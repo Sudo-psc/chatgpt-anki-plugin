@@ -16,7 +16,7 @@ externa) · 🔜 roadmap (pós-v0.1).
 | M2 | Especificação | Requisitos, arquitetura, contratos, testes | C2, C5, C6 | ✅ |
 | M3 | Núcleo | Adapter Anki + servidor MCP + auth | C7, C8 | ✅ (122 testes, cobertura 96,9%/92,3%) |
 | M4 | Interface | Widgets + fluxos de revisão e busca | C10 | 🟡 widgets ✅; developer mode ⛔ (conta ChatGPT) |
-| M5 | Produção | Deploy HTTPS, observabilidade, runbook | C9, C14 | 🟡 pronto p/ deploy; execução ⛔ (FLY_API_TOKEN) |
+| M5 | Produção | Deploy HTTPS, observabilidade, runbook | C9, C14 | ✅ `https://chatgpt-anki-mcp-sudo.fly.dev` (evidência `docs/evidencias/C9-deploy.md`) |
 | M6 | Publicação | Submissão e aprovação OpenAI | C11, C12 | ⛔ (conta OpenAI + revisão humana) |
 
 ## M0 — Bootstrap (T-001…T-011)
@@ -87,8 +87,8 @@ externa) · 🔜 roadmap (pós-v0.1).
 
 | ID | Tarefa | Depende | Agente | Est. | Entregável | Status |
 |:---|:---|:---|:---|:---|:---|:---|
-| T-045 | Deploy HTTPS real (Fly) + verificação `curl /health` | T-040, T-044 | DevOps | 3h | instância pública | ⛔ requer `FLY_API_TOKEN` |
-| T-046 | Segredos de produção + desabilitar dev token | T-045 | Segurança | 2h | env/secrets | ⛔ idem |
+| T-045 | Deploy HTTPS real (Fly) + verificação `curl /health` | T-040, T-044 | DevOps | 3h | https://chatgpt-anki-mcp-sudo.fly.dev (`/health` 200; E2E público OK; escala 1 machine — in-memory codes) | ✅ |
+| T-046 | Segredos de produção + desabilitar dev token | T-045 | Segurança | 2h | `TOKEN_SECRET`+`OAUTH_CLIENT_ID` via fly secrets; `MCP_DEV_TOKEN` ausente; `FLY_API_TOKEN` no repo | ✅ |
 | T-047 | Alertas (ready≠200, taxa de erro, latência) | T-045 | DevOps | 4h | alertas | 🔜 |
 | T-048 | Teste de charge/latência (p95 metas NFR-01) | T-045 | QA | 4h | relatório em evidencias | 🔜 |
 | T-049 | Screenshots dos widgets em developer mode | T-045 | Redator | 2h | `docs/evidencias/` | ⛔ conta ChatGPT |
@@ -105,30 +105,32 @@ externa) · 🔜 roadmap (pós-v0.1).
 | R-05 | Refresh tokens OAuth | T-024 | Segurança | 8h | UX de longa duração |
 | R-06 | Exportador OTel completo + dashboards | T-041 | DevOps | 8h | observabilidade avançada |
 
-## Relatório de status — 2026-10-10
+## Relatório de status — 2026-10-11
 
-**Concluído (M0–M3, parte de M4/M5):** 44/50 tarefas do plano v0.1 ✅.
-Evidências: CI local verde (lint, typecheck, build), **122 testes** + 5 E2E,
-cobertura **96,9% linhas / 92,3% branches** (gate 80/75), smoke E2E OK,
-documentação completa (11 docs + 8 ADRs + legais).
+**Concluído (M0–M3 + M5):** 46/50 tarefas do plano v0.1 ✅.
+Evidências: CI verde no GitHub (lint, typecheck, 122 testes, coverage, build,
+gitleaks, SBOM), cobertura **96,9% linhas / 92,3% branches** (gate 80/75),
+smoke E2E OK, documentação completa (11 docs + 8 ADRs + legais + Pages),
+**deploy público** em `https://chatgpt-anki-mcp-sudo.fly.dev` com fluxo OAuth
+e tools verificados E2E contra a instância real (`docs/evidencias/C9-deploy.md`).
 
 **Pendências e bloqueios:**
 
-1. ⛔ **T-045/T-046 (deploy público)**: requer `FLY_API_TOKEN` (ou host
-   equivalente) do proprietário — infraestrutura pronta (`fly.toml`,
-   `deploy.yml`, Docker), execução bloqueada por credencial/custo.
-2. ⛔ **T-049/T-050 (developer mode + submissão OpenAI)**: requer conta
-   OpenAI verificada (Owner) e interação humana; pacote de submissão 100%
-   preparado em `docs/09-*` com checklist de conformidade.
-3. 🟡 **T-010/T-011**: espelho público no GitHub e issue épica em execução
-   nesta sessão (gh autenticado como Sudo-psc).
-4. 🔜 T-047/T-048: dependem do deploy.
+1. ⛔ **C10 (developer mode)**: endpoint público já pronto e testado; falta a
+   sessão ChatGPT do proprietário para conectar o connector e transcrever os
+   15 prompts (roteiro em `docs/09-*` §7 e `tests/e2e/chatgpt.developer-mode.spec.ts`).
+2. ⛔ **T-049/T-050 (submissão OpenAI)**: requer conta OpenAI verificada
+   (Owner) e revisão humana; pacote de submissão 100% preparado (`docs/09-*`)
+   — políticas já públicas via GitHub Pages.
+3. 🔜 T-047/T-048: alertas e teste de carga (dependem de observabilidade externa).
 
-**Riscos abertos:** exposição do AnkiConnect do usuário em deploy remoto
-(mitigação: túnel privado, documentado); single-tenant limita listagem
-pública plena (ADR-0008/R-01); mudanças no protocolo de sync não nos afetam
-(não usamos AnkiWeb — ADR-0001).
+**Riscos abertos:** escala da instância é limitada a 1 machine enquanto os
+códigos OAuth/DCR/rate limit forem em memória (mitigado com `fly scale count 1`;
+store compartilhado = R-03); exposição do AnkiConnect do usuário em deploy
+remoto (mitigação: túnel privado, documentado); single-tenant limita listagem
+pública plena (ADR-0008/R-01).
 
-**Próximos passos (ordem):** 1) espelho GitHub + proteção de branch;
-2) conectar host de deploy e executar T-045; 3) rodada de developer mode e
-transcrição C10; 4) submissão (T-050) após verificação da conta OpenAI.
+**Próximos passos (ordem):** 1) connect no ChatGPT developer mode apontando
+para `https://chatgpt-anki-mcp-sudo.fly.dev/mcp` + transcrição C10;
+2) submissão (T-050) após verificação da conta OpenAI; 3) T-047/T-048 quando
+a observabilidade externa for contratada.
