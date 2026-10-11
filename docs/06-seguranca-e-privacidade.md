@@ -19,7 +19,10 @@ Documento de referência de segurança; política voltada ao usuário final em
 ## Autenticação e autorização
 
 - **OAuth 2.1**: authorization code + PKCE S256 (obrigatório), DCR restrito por
-  allowlist exata de redirect URIs, consentimento com escopos em pt-BR.
+  allowlist exata de redirect URIs — com a exceção deliberada de callbacks
+  hospedados em `https://chatgpt.com/*` (ex.: `/connector/oauth/<id>`), que são
+  o padrão do conector do ChatGPT; consentimento com escopos em pt-BR.
+  Diagnóstico de rejeições de DCR é logado (`oauth_register_rejected`).
 - **Scopes por operação** (`anki:read|write|review|admin`), enforcement no
   handler de cada tool (ADR-0003); mapa completo em `05-tools-mcp.md`.
 - **Tokens**: HS256/`node:crypto`, TTL 1 h, claims `sub/scope/iss/aud/iat/exp`;

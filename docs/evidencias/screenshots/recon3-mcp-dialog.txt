@@ -1,0 +1,157 @@
+URL: https://chatgpt.com/plugins
+
+FIELDS:
+[
+  {
+    "tag": "INPUT",
+    "type": "text",
+    "name": "",
+    "placeholder": "Procurar plugins",
+    "ariaLabel": null
+  },
+  {
+    "tag": "INPUT",
+    "type": "file",
+    "name": "app-icon",
+    "placeholder": "",
+    "ariaLabel": null
+  },
+  {
+    "tag": "INPUT",
+    "type": "text",
+    "name": "",
+    "placeholder": "Ferramenta personalizada",
+    "ariaLabel": null
+  },
+  {
+    "tag": "TEXTAREA",
+    "type": "textarea",
+    "name": "",
+    "placeholder": "Explique em poucas palavras o que ele faz",
+    "ariaLabel": null
+  },
+  {
+    "tag": "INPUT",
+    "type": "url",
+    "name": "",
+    "placeholder": "https://example.com/mcp",
+    "ariaLabel": "URL do servidor"
+  },
+  {
+    "tag": "SELECT",
+    "type": "select-one",
+    "name": "",
+    "ariaLabel": null
+  },
+  {
+    "tag": "INPUT",
+    "type": "checkbox",
+    "name": "",
+    "placeholder": "",
+    "ariaLabel": null
+  }
+]
+
+BUTTONS:
+URL do servidor
+Túnel
+Configurações avançadas de OAuthRevise as configurações OAuth detectadas ou insira-as manualmente. Em seguida, escolha um método de configuração do cliente e defina os escopos padrão
+Cancelar
+Criar como plugin
+Fechar caixa de diálogo
+
+BODY (últimos 2500 chars):
+ations from Zotero
+Sider Scholar
+Search 350M+ Paper. Save. Chat
+Acumen by Talarion
+Keep your AI up to date.
+Scite
+Search scientific literature
+Negócios e operações
+Shopify
+Create and manage your store
+HubSpot
+Insights to action in HubSpot
+Sales
+Practical workflows for sales
+vidIQ
+Grow on YouTube, IG & TikTok
+Wix
+Create your own website
+Windsor.ai
+Connect 350+ data sources
+Dados e análises
+Data
+Answer questions with data
+PostHog
+Analyze your product data
+Amplitude
+Analyze your product data
+Mixpanel
+Query and analyze Mixpanel
+Helium 10
+Access your Helium 10 data
+Blockscout Blockchain Data
+Find & analyze blockchain data
+Pesquisa científica
+Undermind
+Find and read research papers
+Life Sciences Literature
+Find biomedical papers, preprints, and open-access full text
+NGS Analysis Workbench
+Analyze sequencing data
+Life Sciences Databases
+Query structured public life-science databases
+Molecular Structure Viewer
+Visualize and interact with molecular structures in Codex.
+Biological Sequence & Alignment Viewer
+Inspect, analyze, and compare biological sequences and alignments in Codex.
+Segurança
+Codex Security
+Security scanning for your codebase
+Codex Security Cloud
+Find and fix vulnerabilities across your repositories
+Malwarebytes
+Verify links, domains, phones.
+PrivacyHawk
+Protect your personal data
+AJAXX Data Scrubber
+Remove exposed personal data
+Ansvar Gateway
+Laws, Security and Compliance
+Outros
+LinkedIn
+Find the right professional
+Etsy
+Shop Home, Style & More
+Tarot
+Tarot Reading & Divination
+Kleinanzeigen
+Echte Deals. Echte Menschen.
+Shopee
+Find deals and products
+idealista
+Find properties to buy or rent
+Adicionar servidor MCP personalizado
+Ícone (opcional)
+Apenas PNG. Melhores resultados com 256 x 256 px ou mais. Tamanho máximo do arquivo: 10 KB
+Nome
+Descrição (opcional)
+Conexão
+Conexão
+URL do servidor
+Túnel
+Autenticação
+OAuth
+Sem autenticação
+OAuth ou sem autenticação
+Configurações avançadas de OAuth
+Revise as configurações OAuth detectadas ou insira-as manualmente. Em seguida, escolha um método de configuração do cliente e defina os escopos padrão
+Servidores MCP personalizados apresentam riscos. Saiba mais
+Entendo e quero continuar
+Conecte-se apenas a servidores MCP em que você confia. Um servidor não confiável pode acessar ou roubar informações compartilhadas durante o uso do aplicativo ou enganar o ChatGPT para que use ferramentas de maneiras não previstas, inclusive para alterar ou excluir dados.
+Leia o guia
+Cancelar
+Criar como plugin
+Fechar caixa de diálogo

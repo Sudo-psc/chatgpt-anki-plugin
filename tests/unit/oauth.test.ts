@@ -203,11 +203,36 @@ describe('OAuthService dynamic client registration', () => {
     expect(svc.getClient(client.clientId)?.clientName).toBe('ChatGPT');
   });
 
-  it('rejects non-allowlisted or invalid redirect URIs', () => {
+  it('rejects invalid or third-party redirect URIs and accepts ChatGPT-hosted callbacks', () => {
     const svc = service();
-    expect(() => svc.registerClient({ redirect_uris: ['https://evil.example.com/cb'] })).toThrowError(/allowlist/);
+    expect(() => svc.registerClient({ redirect_uris: ['https://evil.example.com/cb'] })).toThrowError(/not allowed/);
     expect(() => svc.registerClient({ redirect_uris: ['not a url'] })).toThrowError(/not a valid URL/);
-    expect(() => svc.registerClient({ redirect_uris: [] })).toThrowError(/non-empty/);
+    // Callbacks hospedados pelo ChatGPT (padrão do conector) são aceitos via DCR:
+    const gptClient = svc.registerClient({ redirect_uris: ['https://chatgpt.com/connector/oauth/ws-123'] });
+    expect(gptClient.dynamic).toBe(true);
+    expect(gptClient.redirectUris).toEqual(['https://chatgpt.com/connector/oauth/ws-123']);
+    // Registro sem redirect_uris também é aceito (o conector pode operar com callback padrão):
+    const noRedirects = svc.registerClient({});
+    expect(noRedirects.redirectUris).toEqual([]);
+  });
+
+  it('dynamic clients accept ChatGPT-hosted redirects at authorize; env client stays strict', () => {
+    const svc = service();
+    const dynamic = svc.registerClient({});
+    const { params } = validParams(svc);
+    const result = svc.validateAuthorize({
+      ...params,
+      client_id: dynamic.clientId,
+      redirect_uri: 'https://chatgpt.com/connector/oauth/abc-456',
+    });
+    expect(result.ok).toBe(true);
+
+    const strict = svc.validateAuthorize({
+      ...params,
+      client_id: 'chatgpt', // cliente pré-registrado via env: igualdade exata apenas
+      redirect_uri: 'https://chatgpt.com/connector/oauth/abc-456',
+    });
+    expect(strict.ok).toBe(false);
   });
 
   it('respects the allowDcr flag', () => {

@@ -1,0 +1,166 @@
+URL: https://chatgpt.com/plugins
+
+MENUITEMS:
+Criar plugin
+Enviar arquivo compactado do plugin
+Adicionar servidor MCP personalizado
+
+BUTTONS:
+Início
+Espaço
+Agendado
+Plugins
+Explorar
+Projetos
+Sites
+Mapas
+Figma
+Adobe
+Imagens
+Adicionar
+
+BODY (últimos 3000 chars):
+automate, anywhere
+Supabase
+Manage and query databases
+Exa
+Web search for AI agents
+Vercel
+Build and deploy apps
+Railway
+Build and deploy apps
+Base44
+Build Apps & Websites with AI
+Saúde
+Health
+Explore your health data in ChatGPT
+Fitness AI Connector
+AI coach for your Garmin data
+COROS
+Training and health insights
+freddy
+Ask about your health data
+Tredict
+Analyze workouts, create plans
+Calorie Tracker
+Track your food and calories
+Finanças
+Interactive Brokers (IBKR)
+Analyze global markets
+Public Equity Investing
+Public equity research
+Stripe
+Accept payments. Grow revenue.
+Binance
+Explore Binance market data
+Longbridge
+Stock quotes, financial data
+Bigdata.com
+Finance research, news & data
+Viagens
+Booking.com
+Find all best stays and more.
+Trip.com
+All-in-one Travel Companion
+Skyscanner
+Find cheap flights
+Tripadvisor
+Book top-rated hotels
+Flight Network
+Search and book flights
+eDreams
+Find flights and hotels
+Entretenimento
+Spotify
+Music and podcasts for you
+Apple Music
+Build playlists and find music
+Shazam
+Identify songs instantly
+Chessy
+Play Chess Against ChatGPT
+Ticketmaster
+Search Ticketmaster For Events
+Smart Chess:Train+Learn to win
+Play+improve: coach+strategy
+Educação
+SciSpace
+For science and research
+Consensus
+Explore scientific research
+Zotero
+Find papers and add citations from Zotero
+Sider Scholar
+Search 350M+ Paper. Save. Chat
+Acumen by Talarion
+Keep your AI up to date.
+Scite
+Search scientific literature
+Negócios e operações
+Shopify
+Create and manage your store
+HubSpot
+Insights to action in HubSpot
+Sales
+Practical workflows for sales
+vidIQ
+Grow on YouTube, IG & TikTok
+Wix
+Create your own website
+Windsor.ai
+Connect 350+ data sources
+Dados e análises
+Data
+Answer questions with data
+PostHog
+Analyze your product data
+Amplitude
+Analyze your product data
+Mixpanel
+Query and analyze Mixpanel
+Helium 10
+Access your Helium 10 data
+Blockscout Blockchain Data
+Find & analyze blockchain data
+Pesquisa científica
+Undermind
+Find and read research papers
+Life Sciences Literature
+Find biomedical papers, preprints, and open-access full text
+NGS Analysis Workbench
+Analyze sequencing data
+Life Sciences Databases
+Query structured public life-science databases
+Molecular Structure Viewer
+Visualize and interact with molecular structures in Codex.
+Biological Sequence & Alignment Viewer
+Inspect, analyze, and compare biological sequences and alignments in Codex.
+Segurança
+Codex Security
+Security scanning for your codebase
+Codex Security Cloud
+Find and fix vulnerabilities across your repositories
+Malwarebytes
+Verify links, domains, phones.
+PrivacyHawk
+Protect your personal data
+AJAXX Data Scrubber
+Remove exposed personal data
+Ansvar Gateway
+Laws, Security and Compliance
+Outros
+LinkedIn
+Find the right professional
+Etsy
+Shop Home, Style & More
+Tarot
+Tarot Reading & Divination
+Kleinanzeigen
+Echte Deals. Echte Menschen.
+Shopee
+Find deals and products
+idealista
+Find properties to buy or rent
+Criar plugin
+Enviar arquivo compactado do plugin
+Adicionar servidor MCP personalizado

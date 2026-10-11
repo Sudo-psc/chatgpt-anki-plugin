@@ -1,0 +1,991 @@
+URL: https://chatgpt.com/plugins
+
+BUTTONS:
+Início
+Espaço
+Agendado
+Plugins
+Explorar
+Projetos
+Sites
+Mapas
+Figma
+Adobe
+Imagens
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Adicionar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+LINKS:
+Pular para o conteúdo
+Plugins
+Habilidades
+AnkiWeb pelo Navegador
+
+Writing Style
+
+Plugin Creator
+
+CoinGecko
+
+TinyFish
+
+TIM Brasil
+
+Hostinger Mail
+
+Stripe
+
+Zotero
+
+Vercel
+
+Agentic Search by Liner
+
+SubscriptionFlow
+
+Context7
+
+Research
+
+Research Methodology
+
+Research & Writing Copilot
+
+Research Writing Guardrails
+
+Research Assistant
+
+Research Evidence Finder
+
+TextExpander
+
+Taplio
+
+Supermemory
+
+Remote Desktop Commander
+
+alphaXiv
+
+Healthcare Public Data
+
+AMD
+
+MotionDesign
+
+Google Contacts
+
+Slack
+
+Ocoya
+
+1Password
+
+omi
+
+Life Sciences Databases
+
+Life Sciences Literature
+
+Caveman Mode
+
+ChatGPT Ads Manager
+
+AgentMail
+
+Google Calendar
+
+Open Design
+
+Google Drive
+
+to3D
+
+Wiley Scholar Gateway
+
+Flipbook - Publuu
+
+Keystone
+
+Higgsfield
+
+LinkedIn
+
+AI Business Plan by PrometAI
+
+Prompt Perfect
+
+Whimsical
+
+Todoist: To Do List & Calendar
+
+Newsify
+
+Product Hunt
+
+Outlook Email
+
+OpenAI Developers
+
+Scholar Sidekick
+
+SciSpace
+
+Sider Scholar
+
+Notion
+
+Lucid
+
+Mem
+
+Color Designer - Palette Maker
+
+Consensus
+
+BioRender
+
+Superpowers
+
+Codex Security
+
+Build iOS Apps
+
+Build Web Data Visualization
+
+Build macOS Apps
+
+Life Science Research
+
+Build Web Apps
+
+Remotion
+
+HyperFrames by HeyGen
+
+Gmail
+
+Mobbin
+
+Academic Writing Toolkit
+
+Amass
+
+AnyQR
+
+Tripadvisor
+
+Canvs.io whiteboard
+
+AI Voice Generator
+
+WeatherPromise
+
+GetYourGuide
+
+Buson
+
+PandaFind
+
+Zen Shopping
+
+Shopee
+
+Malwarebytes
+
+Buser
+
+AbhiBus
+
+Resume Builder
+
+Indeed Job Search
+
+Course Studio
+
+Ace Knowledge Graph
+
+OKX
+
+Mermaid Chart
+
+Elicit
+
+Investment Banking
+
+Public Equity Investing
+
+Product Design
+
+Creative Production
+
+Data
+
+Financial Datasets
+
+CryptoAudit
+
+Serasa
+
+Binance
+
+Context7
+
+Assessment Generator
+
+Klook
+
+QuintoAndar
+
+Decolar
+
+CALL-E
+
+Awesome Slides
+
+Wayground
+
+Speechify
+
+Strive PDF Generator
+
+Sider Recorder & Transcriber
+
+Skyscanner
+
+Hugging Face
+
+Genspark AI Slides
+
+Manus
+
+Semrush
+
+Flixor
+
+Adobe Acrobat
+
+Coursera Learning
+
+Booking.com
+
+Adobe
+
+Airtable
+
+Apple Music
+
+Canva
+
+Figma
+
+GitHub
+
+
+Populares
+
+
+
+
+
+
+Novos e imperdíveis
+
+
+
+
+
+
+Pequenas empresas
+
+
+
+
+
+
+Produtividade
+
+
+
+
+
+
+Comunicação
+
+
+
+
+
+
+Criatividade
+
+
+
+
+
+
+Ferramentas para desenvolvedores
+
+
+
+
+
+
+Saúde
+
+
+
+
+
+
+Finanças
+
+
+
+
+
+
+Viagens
+
+
+
+
+
+
+Entretenimento
+
+
+
+
+
+
+Educação
+
+
+
+
+
+
+Negócios e operações
+
+
+
+
+
+
+Dados e análises
+
+
+
+
+
+
+Pesquisa científica
+
+
+
+
+
+
+
+
+
+Segurança
+
+
+
+
+
+
+
+Outros
+
+
+
+
+
+
+
+BODY (primeiros 6000 chars):
+Pular para o conteúdo
+Início
+Espaço
+Agendado
+Plugins
+Explorar
+Projetos
+Sites
+Mapas
+Figma
+Adobe
+Imagens
+Personalizar
+Plugins
+Habilidades
+Instalados
+AnkiWeb pelo Navegador
+Writing Style
+Plugin Creator
+CoinGecko
+TinyFish
+TIM Brasil
+Hostinger Mail
+Stripe
+Zotero
+Vercel
+Agentic Search by Liner
+SubscriptionFlow
+Context7
+Research
+Research Methodology
+Research & Writing Copilot
+Research Writing Guardrails
+Research Assistant
+Research Evidence Finder
+TextExpander
+Taplio
+Supermemory
+Remote Desktop Commander
+alphaXiv
+Healthcare Public Data
+AMD
+MotionDesign
+Google Contacts
+Slack
+Ocoya
+1Password
+omi
+Life Sciences Databases
+Life Sciences Literature
+Caveman Mode
+ChatGPT Ads Manager
+AgentMail
+Google Calendar
+Open Design
+Google Drive
+to3D
+Wiley Scholar Gateway
+Flipbook - Publuu
+Keystone
+Higgsfield
+LinkedIn
+AI Business Plan by PrometAI
+Prompt Perfect
+Whimsical
+Todoist: To Do List & Calendar
+Newsify
+Product Hunt
+Outlook Email
+OpenAI Developers
+Scholar Sidekick
+SciSpace
+Sider Scholar
+Notion
+Lucid
+Mem
+Color Designer - Palette Maker
+Consensus
+BioRender
+Superpowers
+Codex Security
+Build iOS Apps
+Build Web Data Visualization
+Build macOS Apps
+Life Science Research
+Build Web Apps
+Remotion
+HyperFrames by HeyGen
+Gmail
+Mobbin
+Academic Writing Toolkit
+Amass
+AnyQR
+Tripadvisor
+Canvs.io whiteboard
+AI Voice Generator
+WeatherPromise
+GetYourGuide
+Buson
+PandaFind
+Zen Shopping
+Shopee
+Malwarebytes
+Buser
+AbhiBus
+Resume Builder
+Indeed Job Search
+Course Studio
+Ace Knowledge Graph
+OKX
+Mermaid Chart
+Elicit
+Investment Banking
+Public Equity Investing
+Product Design
+Creative Production
+Data
+Financial Datasets
+CryptoAudit
+Serasa
+Binance
+Context7
+Assessment Generator
+Klook
+QuintoAndar
+Decolar
+CALL-E
+Awesome Slides
+Wayground
+Speechify
+Strive PDF Generator
+Sider Recorder & Transcriber
+Skyscanner
+Hugging Face
+Genspark AI Slides
+Manus
+Semrush
+Flixor
+Adobe Acrobat
+Coursera Learning
+Booking.com
+Adobe
+Airtable
+Apple Music
+Canva
+Figma
+GitHub
+Plugins
+Pesquisar plugins
+Adicionar
+Conecte plugins para que o ChatGPT trabalhe com suas ferramentas
+Público
+Pessoais
+Populares
+Gmail
+Read and manage Gmail
+Google Drive
+Drive, Docs, Sheets or Slides
+GitHub
+Triage PRs, issues, CI, and publish flows
+Google Calendar
+Manage Google Calendar events
+Outlook Email
+Triage Outlook inboxes
+Slack
+Read and manage Slack
+Novos e imperdíveis
+Adobe
+Design, combine, and edit
+tldraw
+Draw and diagram with agents
+Canva
+Create, review, edit designs
+Figma
+Create designs, ship to code
+Shopify
+Create and manage your store
+MagicPath
+Design directly in ChatGPT
+Pequenas empresas
+Dropbox
+Find, create, and take action
+HubSpot
+Insights to action in HubSpot
+Stripe
+Accept payments. Grow revenue.
+Canva
+Create, review, edit designs
+Gusto
+People and payroll, made easy
+Figma
+Create designs, ship to code
+Produtividade
+Firecrawl
+Search and extract web data
+Notion
+Create docs, tasks, databases
+Granola
+Add your meeting context
+Todoist: To Do List & Calendar
+Planner & Reminders
+Outlook Calendar
+Manage Outlook schedules
+Asana
+Turn chats into actions
+Comunicação
+Teams
+Summarize Teams and follow up
+Superhuman Mail
+Best email+calendar assistant
+Zoom
+Insights from Zoom
+Hostinger Mail
+Use Hostinger Mail
+Mailopoly Inbox
+Search, send emails & messages
+RingCentral Phone
+Calls, SMS, and voicemail
+Criatividade
+Higgsfield
+Every image and video model
+Product Design
+Explore and prototype ideas
+Figma
+Create designs, ship to code
+Canva
+Create, review, edit designs
+Runway
+Generate with every AI model
+Creative Production
+Create marketing visuals from a brief or product image.
+Ferramentas para desenvolvedores
+Remote Desktop Commander
+Build and automate, anywhere
+Supabase
+Manage and query databases
+Exa
+Web search for AI agents
+Vercel
+Build and deploy apps
+Railway
+Build and deploy apps
+Base44
+Build Apps & Websites with AI
+Saúde
+Health
+Explore your health data in ChatGPT
+Fitness AI Connector
+AI coach for your Garmin data
+COROS
+Training and health insights
+freddy
+Ask about your health data
+Tredict
+Analyze workouts, create plans
+Calorie Tracker
+Track your food and calories
+Finanças
+Interactive Brokers (IBKR)
+Analyze global markets
+Public Equity Investing
+Public equity research
+Stripe
+Accept payments. Grow revenue.
+Binance
+Explore Binance market data
+Longbridge
+Stock quotes, financial data
+Bigdata.com
+Finance research, news & data
+Viagens
+Booking.com
+Find all best stays and more.
+Trip.com
+All-in-one Travel Companion
+Skyscanner
+Find cheap flights
+Tripadvisor
+Book top-rated hotels
+Flight Network
+Search and book flights
+eDreams
+Find flights and hotels
+Entretenimento
+Spotify
+Music and podcasts for you
+Apple Music
+Build playlists and find music
+Shazam
+Identify songs instantly
+Chessy
+Play Chess Against ChatGPT
+Ticketmaster
+Search Ticketmaster For Events
+Smart Chess:Train+Learn to win
+Play+improve: coach+strategy
+Educação
+SciSpace
+For science and research
+Consensus
+Explore scientific research
+Zotero
+Find papers and add citations from Zotero
+Sider Scholar
+Search 350M+ Paper. Save. Chat
+Acumen by Talarion
+Keep your AI up to date.
+Scite
+Search scientific literature
+Negócios e operações
+Shopify
+Create and manage your store
+HubSpot
+Insights to action in HubSpot
+Sales
+Practical workflows for sales
+vidIQ
+Grow on YouTube, IG & TikTok
+Wix
+Create your own website
+Windsor.ai
+Connect 350+ data sources
+Dados e análises
+Data
+Answer questions with data
+PostHog
+Analyze your product data
+Amplitude
+Analyze your product data
+Mixpanel
+Query and analyze Mixpanel
+Helium 10
+Access your Helium 10 data
+Blockscout Blockchain Data
+Find & analyze blockchain data
+Pesquisa científica
+Undermind
+Find and read research papers
+Life Sciences Literature
+Find biomedical papers, preprints, and open-access full text
+NGS Analysis Workbench
+Analyze sequencing data
+Life Sciences Databases
+Query structured public life-science databases
+Molecular Structure Viewer
+Visualize and interact with molecular structures in Codex.
+Biological Sequence & Alignment Viewer
+Inspect, analyze, and compare biological sequences and alignments in Codex.
+Segurança
+Codex Security
+Security scannin

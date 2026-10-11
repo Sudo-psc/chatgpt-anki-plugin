@@ -192,6 +192,10 @@ export async function createApp(deps: CreateAppDeps): Promise<App> {
         ...(client.clientSecret ? { client_secret: client.clientSecret } : {}),
       });
     } catch (error) {
+      logger.warn('oauth_register_rejected', {
+        reason: error instanceof Error ? error.message : String(error),
+        redirect_uris: (body as Record<string, unknown>).redirect_uris,
+      });
       return oauthErrorResponse(res, error);
     }
   }

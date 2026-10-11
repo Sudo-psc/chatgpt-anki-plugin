@@ -16,6 +16,27 @@ export interface OAuthClientRecord {
   tokenEndpointAuthMethod: 'none' | 'client_secret_post';
   clientSecret?: string;
   createdAt: number;
+  /**
+   * true para clientes registrados via DCR. Clientes dinâmicos aceitam, na
+   * autorização, callbacks hospedados em domínios ChatGPT/OpenAI (o conector
+   * usa caminhos como /connector/oauth/<id> que mudam por workspace).
+   */
+  dynamic?: boolean;
+}
+
+/** Callbacks hospedados pelo ChatGPT/OpenAI são confiáveis por definição do conector. */
+export function isChatGptHostedRedirect(uri: string): boolean {
+  try {
+    const parsed = new URL(uri);
+    return (
+      parsed.protocol === 'https:' &&
+      (parsed.hostname === 'chatgpt.com' ||
+        parsed.hostname === 'chat.openai.com' ||
+        parsed.hostname.endsWith('.chatgpt.com'))
+    );
+  } catch {
+    return false;
+  }
 }
 
 export class OAuthError extends Error {
@@ -116,19 +137,16 @@ export class OAuthService {
     const redirectUris = Array.isArray(input.redirect_uris)
       ? input.redirect_uris.filter((uri): uri is string => typeof uri === 'string')
       : [];
-    if (redirectUris.length === 0) {
-      throw new OAuthError('invalid_request', 'redirect_uris must be a non-empty array of URLs.');
-    }
     for (const uri of redirectUris) {
       try {
         new URL(uri);
       } catch {
         throw new OAuthError('invalid_request', `redirect_uri "${uri}" is not a valid URL.`);
       }
-      if (!this.options.allowedRedirectUris.includes(uri)) {
+      if (!this.options.allowedRedirectUris.includes(uri) && !isChatGptHostedRedirect(uri)) {
         throw new OAuthError(
           'invalid_request',
-          `redirect_uri "${uri}" is not in the server allowlist. Allowed: ${this.options.allowedRedirectUris.join(', ')}.`,
+          `redirect_uri "${uri}" is not allowed. Allowed: the server allowlist (${this.options.allowedRedirectUris.join(', ')}) and ChatGPT-hosted https://chatgpt.com/* callbacks.`,
         );
       }
     }
@@ -139,6 +157,7 @@ export class OAuthService {
       redirectUris,
       tokenEndpointAuthMethod: 'none',
       createdAt: this.now(),
+      dynamic: true,
     };
     this.clients.set(clientId, record);
     return record;
@@ -159,14 +178,24 @@ export class OAuthService {
           'Unknown client_id. Register the client first (POST /oauth/register) or use the pre-registered client_id.',
       };
     }
-    if (typeof params.redirect_uri !== 'string' || !client.redirectUris.includes(params.redirect_uri)) {
+    if (typeof params.redirect_uri !== 'string') {
       return {
         ok: false,
         error: 'invalid_request',
-        description: `redirect_uri "${params.redirect_uri ?? ''}" is not registered for this client. Registered: ${client.redirectUris.join(', ')}`,
+        description: `redirect_uri "${params.redirect_uri ?? ''}" is not registered for this client. Registered: ${client.redirectUris.join(', ') || '(none)'}`,
       };
     }
     const redirectUri = params.redirect_uri;
+    const redirectAllowed =
+      client.redirectUris.includes(redirectUri) ||
+      (client.dynamic === true && isChatGptHostedRedirect(redirectUri));
+    if (!redirectAllowed) {
+      return {
+        ok: false,
+        error: 'invalid_request',
+        description: `redirect_uri "${redirectUri}" is not registered for this client. Registered: ${client.redirectUris.join(', ') || '(none)'}`,
+      };
+    }
     const redirectable = (error: string, description: string): AuthorizeValidation => ({
       ok: false,
       error,
