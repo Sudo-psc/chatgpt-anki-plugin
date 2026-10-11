@@ -1,0 +1,46 @@
+# Uso:
+#   Produção/local com Anki real:
+#     docker compose -f docker/docker-compose.yml up -d --build
+#   Demo (coleção sintética, sem Anki):
+#     docker compose -f docker/docker-compose.yml --profile demo up -d --build anki-mcp-demo
+#
+# No modo real, AnkiConnect deve estar acessível ao container em
+# host.docker.internal:8765 (Anki Desktop rodando na máquina host).
+services:
+  anki-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - '8080:8080'
+    environment:
+      PORT: '8080'
+      HOST: '0.0.0.0'
+      PUBLIC_BASE_URL: '${PUBLIC_BASE_URL:-http://localhost:8080}'
+      NODE_ENV: '${NODE_ENV:-production}'
+      LOG_LEVEL: '${LOG_LEVEL:-info}'
+      ANKI_BACKEND: '${ANKI_BACKEND:-connect}'
+      ANKI_CONNECT_URL: '${ANKI_CONNECT_URL:-http://host.docker.internal:8765}'
+      TOKEN_SECRET: '${TOKEN_SECRET:-docker-dev-secret-0123456789abcdef0123456789abcdef}'
+      MCP_DEV_TOKEN: '${MCP_DEV_TOKEN:-}'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+
+  anki-mcp-demo:
+    profiles: ['demo']
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - '8080:8080'
+    environment:
+      PORT: '8080'
+      HOST: '0.0.0.0'
+      PUBLIC_BASE_URL: 'http://localhost:8080'
+      NODE_ENV: 'development'
+      LOG_LEVEL: 'info'
+      ANKI_BACKEND: 'mock'
+      TOKEN_SECRET: 'demo-secret-0123456789abcdef0123456789abcdef'
+      MCP_DEV_TOKEN: 'demo-token-change-me'
+    restart: unless-stopped

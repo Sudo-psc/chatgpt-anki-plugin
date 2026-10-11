@@ -1,0 +1,24 @@
+# Gitleaks configuration — extends the default ruleset with allowlists for
+# documented placeholders. CI runs: gitleaks detect --no-git (working tree) and
+# gitleaks git (history).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders de documentação e exemplos (sem segredos reais)"
+paths = [
+  '''(?i)\.env\.example$''',
+  '''(?i)docs/''',
+  '''(?i)README\.md$''',
+  '''(?i)tests/.*fixtures.*''',
+]
+regexes = [
+  '''dev-only-secret-change-me''',
+  '''replace-with-a-random-secret''',
+  '''demo-token-change-me''',
+  '''demo-secret-0123456789abcdef''',
+  '''docker-dev-secret-0123456789abcdef''',
+  '''unit-dev-token-0123456789abcdef''',
+  '''smoke-dev-token-0123456789abcdef''',
+  '''test-secret-0123456789abcdef''',
+]
