@@ -413,8 +413,11 @@ if (PHASE === 'connect') {
         }
       }
       if (page.url().includes('/oauth/authorize')) {
-        await page.getByRole('button', { name: /autorizar/i }).click({ timeout: 5000 }).catch(() => {});
-        consentApproved = true;
+        const autorizar = page.getByRole('button', { name: /autorizar/i }).first();
+        if (await autorizar.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await autorizar.click().catch(() => {});
+          consentApproved = true;
+        }
       }
       await sleep(2000);
     }

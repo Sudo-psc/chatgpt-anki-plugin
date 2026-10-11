@@ -201,6 +201,7 @@ describe('MCP endpoint authentication (C7)', () => {
     expect(refresh.status).toBe(400);
     expect(await refresh.text()).toContain('unsupported_grant_type');
 
+    // Cliente desconhecido (legado) no token endpoint: o code inválido é rejeitado (400 invalid_grant).
     const unknownClient = await fetch(`${app.baseUrl}/oauth/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -212,7 +213,8 @@ describe('MCP endpoint authentication (C7)', () => {
         code_verifier: 'x',
       }),
     });
-    expect(unknownClient.status).toBe(401);
+    expect(unknownClient.status).toBe(400);
+    expect(await unknownClient.text()).toContain('invalid_grant');
   });
 
   it('supports dynamic client registration end to end', async () => {

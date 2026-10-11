@@ -1,0 +1,179 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1791689092805,
+  "projectRoot": "/Users/philipecruz/harnesses/opencode-2026-09-25-23-48/chatgpt-anki-plugin",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=20",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.64.0",
+        "category": "testing"
+      },
+      {
+        "name": "vitest",
+        "version": "3.2.7",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 20"
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "tsx watch src/index.ts",
+      "demo": "tsx scripts/demo.ts",
+      "start": "node dist/index.js",
+      "build": "tsc -p tsconfig.build.json && cp -R src/widgets dist/widgets",
+      "typecheck": "tsc --noEmit",
+      "lint": "eslint .",
+      "test": "vitest run",
+      "test:unit": "vitest run tests/unit",
+      "test:integration": "vitest run tests/integration",
+      "test:contract": "vitest run tests/contract",
+      "test:coverage": "vitest run --coverage",
+      "e2e": "playwright test",
+      "smoke": "bash scripts/smoke.sh"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase/PascalCase",
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "coverage": {
+      "path": "coverage",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1791689092747,
+      "keyFiles": [
+        "base.css",
+        "block-navigation.js",
+        "coverage-summary.json",
+        "favicon.png",
+        "index.html"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 6,
+      "lastAccessed": 1791689092747,
+      "keyFiles": [
+        "app.js",
+        "app.js.map",
+        "index.js",
+        "index.js.map",
+        "version.js"
+      ]
+    },
+    "docker": {
+      "path": "docker",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1791689092748,
+      "keyFiles": [
+        "Dockerfile",
+        "docker-compose.yml"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 11,
+      "lastAccessed": 1791689092773,
+      "keyFiles": [
+        "00-visao-geral.md",
+        "01-requisitos-funcionais.md",
+        "02-requisitos-nao-funcionais.md",
+        "03-arquitetura.md",
+        "05-tools-mcp.md"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 3,
+      "lastAccessed": 1791689092777,
+      "keyFiles": [
+        "chatgpt-browser-assist.mjs",
+        "demo.ts",
+        "smoke.sh"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1791689092777,
+      "keyFiles": [
+        "app.ts",
+        "index.ts",
+        "version.ts"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1791689092779,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1791689092781,
+      "keyFiles": []
+    },
+    "tests/helpers": {
+      "path": "tests/helpers",
+      "purpose": "Helper functions",
+      "fileCount": 1,
+      "lastAccessed": 1791689092790,
+      "keyFiles": [
+        "test-app.ts"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

@@ -268,9 +268,10 @@ export async function createApp(deps: CreateAppDeps): Promise<App> {
     }
     const client = deps.oauth.getClient(clientId);
     if (!client) {
-      return oauthErrorResponse(res, new OAuthError('invalid_client', 'Unknown client_id.', 401));
-    }
-    if (client.clientSecret) {
+      // Cliente legado (pré-ids-assinados): o code + PKCE são as credenciais; o
+      // exchangeCode valida o vínculo com o clientId. Observabilidade:
+      logger.warn('oauth_legacy_client_token_exchange', { client_id_prefix: clientId.slice(0, 12) });
+    } else if (client.clientSecret) {
       const provided = form.get('client_secret');
       if (provided !== client.clientSecret) {
         return oauthErrorResponse(res, new OAuthError('invalid_client', 'Invalid client_secret.', 401));

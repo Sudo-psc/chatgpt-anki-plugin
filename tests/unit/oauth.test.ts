@@ -60,12 +60,26 @@ describe('OAuthService.validateAuthorize', () => {
     if (result.ok) expect(result.scope).toEqual(['anki:read', 'anki:write', 'anki:review']);
   });
 
-  it('rejects unknown clients without a redirect target', () => {
+  it('unknown clients are only accepted within the redirect policy (legacy compat)', () => {
     const result = service().validateAuthorize(validParams(service()).params);
-    const unknown = service().validateAuthorize({ ...validParams(service()).params, client_id: 'nope' });
     expect(result.ok).toBe(true);
-    expect(unknown.ok).toBe(false);
-    if (!unknown.ok) expect(unknown.redirectUri).toBeUndefined();
+
+    // Cliente desconhecido + redirect fora da política ⇒ rejeitado, sem redirect de erro.
+    const outsidePolicy = service().validateAuthorize({
+      ...validParams(service()).params,
+      client_id: 'nope',
+      redirect_uri: 'https://evil.example.com/cb',
+    });
+    expect(outsidePolicy.ok).toBe(false);
+    if (!outsidePolicy.ok) expect(outsidePolicy.redirectUri).toBeUndefined();
+
+    // Cliente desconhecido (legado) + redirect hospedado no ChatGPT ⇒ aceito.
+    const withinPolicy = service().validateAuthorize({
+      ...validParams(service()).params,
+      client_id: 'nope',
+      redirect_uri: 'https://chatgpt.com/connector/oauth/x',
+    });
+    expect(withinPolicy.ok).toBe(true);
   });
 
   it('rejects unregistered redirect_uri', () => {
@@ -238,6 +252,28 @@ describe('OAuthService dynamic client registration', () => {
     // Segredo diferente (outra instalação) rejeita o id.
     const otherSecret = service({ signingSecret: 'another-signing-secret-0123456789ab' });
     expect(otherSecret.getClient(client.clientId)).toBeUndefined();
+  });
+
+  it('accepts legacy unknown client ids when the redirect is within policy (post-fix compatibility)', () => {
+    const svc = service();
+    const { params } = validParams(svc);
+
+    const legacyChatGpt = svc.validateAuthorize({
+      ...params,
+      client_id: 'mcp-0123456789abcdef01234567',
+      redirect_uri: 'https://chatgpt.com/connector/oauth/legacy',
+    });
+    expect(legacyChatGpt.ok).toBe(true);
+
+    const legacyAllowlisted = svc.validateAuthorize({ ...params, client_id: 'mcp-legacy', redirect_uri: ALLOWED });
+    expect(legacyAllowlisted.ok).toBe(true);
+
+    const legacyEvil = svc.validateAuthorize({
+      ...params,
+      client_id: 'mcp-legacy',
+      redirect_uri: 'https://evil.example.com/cb',
+    });
+    expect(legacyEvil.ok).toBe(false);
   });
 
   it('dynamic clients accept ChatGPT-hosted redirects at authorize; env client stays strict', () => {

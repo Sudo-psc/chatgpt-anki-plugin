@@ -224,9 +224,36 @@ export class OAuthService {
     }
   }
 
+  /**
+   * Compatibilidade pós-fix (2026-10-11): client ids registrados ANTES dos ids
+   * assinados (ou perdidos num restart) não existem mais no servidor. Como o
+   * DCR é aberto, o registro NÃO é uma fronteira de segurança — a fronteira é a
+   * política de redirect (allowlist exata ou callback hospedado em
+   * chatgpt.com). Aceitamos client ids legados apenas dentro dessa política;
+   * PKCE continua obrigatório e o code fica vinculado ao clientId informado.
+   */
+  private synthesizeLegacyClient(
+    clientId: string | undefined,
+    redirectUri: string | undefined,
+  ): OAuthClientRecord | undefined {
+    if (!clientId || typeof redirectUri !== 'string') return undefined;
+    const allowed =
+      this.options.allowedRedirectUris.includes(redirectUri) || isChatGptHostedRedirect(redirectUri);
+    if (!allowed) return undefined;
+    return {
+      clientId,
+      redirectUris: [],
+      tokenEndpointAuthMethod: 'none',
+      createdAt: this.now(),
+      dynamic: true,
+    };
+  }
+
   validateAuthorize(params: AuthorizeParams): AuthorizeValidation {
-    const client = this.getClient(params.client_id);
     const state = params.state;
+    const requestedRedirect = typeof params.redirect_uri === 'string' ? params.redirect_uri : undefined;
+    const client =
+      this.getClient(params.client_id) ?? this.synthesizeLegacyClient(params.client_id, requestedRedirect);
     if (!client) {
       return {
         ok: false,
@@ -245,6 +272,7 @@ export class OAuthService {
     const redirectUri = params.redirect_uri;
     const redirectAllowed =
       client.redirectUris.includes(redirectUri) ||
+      this.options.allowedRedirectUris.includes(redirectUri) ||
       (client.dynamic === true && isChatGptHostedRedirect(redirectUri));
     if (!redirectAllowed) {
       return {
