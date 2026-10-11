@@ -32,8 +32,8 @@ externa) · 🔜 roadmap (pós-v0.1).
 | T-007 | Arquitetura (C4, fluxos, modelo de erro, matriz de config) | T-004 | Arquiteto | 6h | `docs/03-*` | ✅ |
 | T-008 | ADRs 0002–0008 (stack, auth, stateless, zod, testes, deploy, tenancy) | T-007 | Arquiteto | 6h | `docs/04-adr/*` | ✅ |
 | T-009 | CI/CD: ci (lint/typecheck/test/build/gitleaks/SBOM), release ghcr, deploy manual | T-001 | DevOps | 6h | `.github/workflows/*` | ✅ |
-| T-010 | Espelho GitHub público + branch protection + Pages (legais) | T-001 | DevOps | 2h | repo remoto | 🟡 em execução |
-| T-011 | Issue épica "Plano de Desenvolvimento" + backlog vivo | T-001 | Orquestrador | 2h | issue + este doc | 🟡 |
+| T-010 | Espelho GitHub público + branch protection + Pages (legais) | T-001 | DevOps | 2h | https://github.com/Sudo-psc/chatgpt-anki-plugin (proteção: PR+review; Pages: https://sudo-psc.github.io/chatgpt-anki-plugin/) | ✅ |
+| T-011 | Issue épica "Plano de Desenvolvimento" + backlog vivo | T-001 | Orquestrador | 2h | issue [#1](https://github.com/Sudo-psc/chatgpt-anki-plugin/issues/1) + este doc | ✅ |
 
 ## M1/M2 — Pesquisa e Especificação (T-012…T-016)
 

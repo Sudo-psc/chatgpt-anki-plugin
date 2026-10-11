@@ -6,7 +6,7 @@ regeneráveis via os comandos indicados; evidências externas exigem conta
 
 | # | Critério | Evidência | Como reproduzir |
 |:---|:---|:---|:---|
-| C1 | Repo público com README/LICENSE/CONTRIBUTING e estrutura | URL do repositório + `git ls-tree -r main` | `git ls-tree -r main` |
+| C1 | Repo público com README/LICENSE/CONTRIBUTING e estrutura | https://github.com/Sudo-psc/chatgpt-anki-plugin (103 arquivos em `main`) + `git ls-tree -r main` | `git ls-tree -r main` |
 | C2 | Plano com ≥40 tarefas | [`10-backlog-e-cronograma.md`](../10-backlog-e-cronograma.md) (50 tarefas) | leitura |
 | C3 | ≥12 FR + ≥10 NFR com critérios | [`01-*`](../01-requisitos-funcionais.md), [`02-*`](../02-requisitos-nao-funcionais.md) (14+12) | leitura |
 | C4 | ≥6 ADRs | [`04-adr/`](../04-adr/) (8 ADRs) | leitura |
@@ -24,10 +24,10 @@ regeneráveis via os comandos indicados; evidências externas exigem conta
 
 ## Status atual (2026-10-10)
 
-- **Verdes localmente:** C2, C3, C4, C5, C6, C7, C8, C14, C15 (CI local:
-  lint+typecheck+122 testes+coverage+build; gitleaks config pronto).
-- **Parciais:** C1 (repo local completo; espelho GitHub em execução),
-  C13 (quickstart medido no smoke; formulário de usabilidade pendente).
+- **Verdes:** C1 (repo público + proteção + Pages), C2, C3, C4, C5, C6, C7, C8,
+  C14, C15 (CI local: lint+typecheck+122 testes+coverage+build; gitleaks no CI).
+- **Parciais:** C13 (quickstart medido no smoke; formulário de usabilidade com
+  terceiro pendente).
 - **Bloqueados externamente:** C9, C10, C11, C12 — requerem credenciais/contas
   do proprietário (FLY_API_TOKEN, conta OpenAI, sessão ChatGPT). Todos os
   pacotes preparatórios estão prontos.
