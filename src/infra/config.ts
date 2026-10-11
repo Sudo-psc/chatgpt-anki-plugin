@@ -54,6 +54,13 @@ const ConfigSchema = z.object({
   ),
   DEFAULT_SCOPE: spaceList.default('anki:read anki:write anki:review'),
   AUTH_REQUIRED: boolFromEnv(true),
+  OWNER_PASSWORD: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+    .refine((value) => value === undefined || value.length >= 12, {
+      message: 'OWNER_PASSWORD must have at least 12 characters.',
+    }),
   MCP_DEV_TOKEN: z
     .string()
     .optional()
@@ -80,6 +87,8 @@ export interface AuthConfig {
   defaultScopes: string[];
   required: boolean;
   devToken?: string;
+  /** Senha do dono exigida na tela de consentimento antes de emitir um authorization code. */
+  ownerPassword?: string;
 }
 
 export interface AppConfig {
@@ -115,6 +124,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       'TOKEN_SECRET must be set to a strong random value in production (generate one with `openssl rand -base64 48`).',
     );
   }
+  if (cfg.NODE_ENV === 'production') {
+    if (cfg.MCP_DEV_TOKEN) {
+      throw new Error('MCP_DEV_TOKEN is a dev-only bypass and must not be set in production.');
+    }
+    if (!cfg.AUTH_REQUIRED) {
+      throw new Error('AUTH_REQUIRED=false is dev-only and must not be used in production.');
+    }
+    // Sem senha, qualquer visitante que abra /oauth/authorize aprova o próprio acesso.
+    if (cfg.ANKI_BACKEND === 'connect' && !cfg.OWNER_PASSWORD) {
+      throw new Error(
+        'OWNER_PASSWORD must be set in production with ANKI_BACKEND=connect; otherwise anyone can approve access to your Anki on the consent page.',
+      );
+    }
+  }
 
   const publicBaseUrl = normalizeUrl(cfg.PUBLIC_BASE_URL);
 
@@ -142,6 +165,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       defaultScopes: cfg.DEFAULT_SCOPE,
       required: cfg.AUTH_REQUIRED,
       devToken: cfg.MCP_DEV_TOKEN,
+      ownerPassword: cfg.OWNER_PASSWORD,
     },
     limits: {
       ratePerMinute: cfg.RATE_LIMIT_PER_MINUTE,

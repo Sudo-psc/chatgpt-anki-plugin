@@ -55,6 +55,30 @@ describe('loadConfig', () => {
     ).toThrowError(/TOKEN_SECRET must be set/);
   });
 
+  it('refuses to boot in production against a real Anki without OWNER_PASSWORD', () => {
+    const strong = 'x'.repeat(48);
+    expect(() =>
+      loadConfig(env({ NODE_ENV: 'production', TOKEN_SECRET: strong, ANKI_BACKEND: 'connect' })),
+    ).toThrowError(/OWNER_PASSWORD/);
+    expect(() =>
+      loadConfig(env({ NODE_ENV: 'production', TOKEN_SECRET: strong, ANKI_BACKEND: 'mock' })),
+    ).not.toThrow();
+    const config = loadConfig(
+      env({ NODE_ENV: 'production', TOKEN_SECRET: strong, ANKI_BACKEND: 'connect', OWNER_PASSWORD: 'p'.repeat(16) }),
+    );
+    expect(config.auth.ownerPassword).toBe('p'.repeat(16));
+  });
+
+  it('rejects owner passwords shorter than 12 characters', () => {
+    expect(() => loadConfig(env({ OWNER_PASSWORD: 'short' }))).toThrowError(/OWNER_PASSWORD/);
+  });
+
+  it('refuses dev-only auth bypasses in production', () => {
+    const base = { NODE_ENV: 'production', TOKEN_SECRET: 'x'.repeat(48), ANKI_BACKEND: 'mock' };
+    expect(() => loadConfig(env({ ...base, MCP_DEV_TOKEN: 'abc' }))).toThrowError(/MCP_DEV_TOKEN/);
+    expect(() => loadConfig(env({ ...base, AUTH_REQUIRED: 'false' }))).toThrowError(/AUTH_REQUIRED/);
+  });
+
   it('treats empty optional strings as undefined', () => {
     const config = loadConfig(env({ MCP_DEV_TOKEN: '', OAUTH_CLIENT_SECRET: '', ANKI_CONNECT_API_KEY: '' }));
     expect(config.auth.devToken).toBeUndefined();

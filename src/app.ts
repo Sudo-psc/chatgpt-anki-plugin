@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -50,8 +51,35 @@ const WIDGET_FILES: Record<string, string> = {
 const WIDGET_CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors https://chatgpt.com https://*.chatgpt.com";
 
+/** A tela de consentimento nunca pode ser emoldurada (clickjacking) nem cacheada. */
+// Sem `form-action`: Chrome/Firefox aplicam a diretiva também ao 302 que segue o
+// POST, o que bloquearia o redirect para o redirect_uri do cliente.
+const CONSENT_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
+
+/** Senhas erradas por IP e no total, por minuto. Acertos não consomem a cota. */
+const CONSENT_FAILURES_PER_IP = 10;
+const CONSENT_FAILURES_GLOBAL = 50;
+
 export async function createApp(deps: CreateAppDeps): Promise<App> {
   const { config, logger } = deps;
+
+  const ownerPasswordRequired = config.auth.ownerPassword !== undefined;
+  const ownerPasswordDigest = config.auth.ownerPassword
+    ? createHash('sha256').update(config.auth.ownerPassword).digest()
+    : undefined;
+  const consentFailuresByIp = new FixedWindowLimiter(CONSENT_FAILURES_PER_IP);
+  const consentFailuresGlobal = new FixedWindowLimiter(CONSENT_FAILURES_GLOBAL);
+
+  function ownerPasswordMatches(candidate: string | undefined): boolean {
+    if (!ownerPasswordDigest || typeof candidate !== 'string') return false;
+    return timingSafeEqual(createHash('sha256').update(candidate).digest(), ownerPasswordDigest);
+  }
+
+  if (!ownerPasswordRequired && config.auth.required) {
+    logger.warn('oauth_consent_unauthenticated', {
+      note: 'OWNER_PASSWORD não definido: qualquer visitante pode aprovar acesso na tela de consentimento.',
+    });
+  }
 
   /**
    * Stateless MCP mode: the SDK requires a fresh server + transport pair per
@@ -88,13 +116,20 @@ export async function createApp(deps: CreateAppDeps): Promise<App> {
     try {
       await route(req, res, url);
     } catch (error) {
-      if (error instanceof HttpError) {
-        sendJson(res, error.status, { error: 'request_error', message: error.message }, error.headers);
-      } else {
+      if (!(error instanceof HttpError) || res.headersSent) {
         logger.error('unhandled_request_error', {
           path: url.pathname,
           error: error instanceof Error ? error.message : String(error),
+          headers_sent: res.headersSent,
         });
+      }
+      // Um erro depois de a resposta começar (ex.: no transporte MCP) não pode
+      // reescrever headers: writeHead lançaria ERR_HTTP_HEADERS_SENT fora do try.
+      if (res.headersSent) {
+        res.end();
+      } else if (error instanceof HttpError) {
+        sendJson(res, error.status, { error: 'request_error', message: error.message }, error.headers);
+      } else {
         sendJson(res, 500, { error: 'internal_error', message: 'Unexpected internal error.' });
       }
     } finally {
@@ -209,7 +244,7 @@ export async function createApp(deps: CreateAppDeps): Promise<App> {
       }
       return sendJson(res, 400, { error: validation.error, error_description: validation.description });
     }
-    return sendHtml(res, 200, consentPageHtml(validation, params));
+    return sendConsentPage(res, 200, consentPageHtml(validation, params, { requirePassword: ownerPasswordRequired }));
   }
 
   async function handleApprove(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -225,13 +260,47 @@ export async function createApp(deps: CreateAppDeps): Promise<App> {
     if (params.decision !== 'approve') {
       return redirectWithError(res, validation.redirectUri, 'access_denied', 'The user denied the authorization request.', validation.state);
     }
-    const code = deps.oauth.createAuthorizationCode({
-      clientId: validation.client.clientId,
-      redirectUri: validation.redirectUri,
-      codeChallenge: validation.codeChallenge,
-      scope: validation.scope,
-      subject: 'owner',
-    });
+    if (ownerPasswordRequired) {
+      // Só falhas contam: um visitante não consegue trancar o dono que acerta a senha
+      // de outro IP. O teto global limita brute force distribuído / IP forjado.
+      const clientIp = clientAddress(req);
+      const byIp = consentFailuresByIp.blocked(clientIp);
+      const decision = byIp.allowed ? consentFailuresGlobal.blocked('global') : byIp;
+      if (!decision.allowed) {
+        logger.warn('oauth_consent_throttled', { retry_after_seconds: decision.retryAfterSeconds });
+        res.setHeader('Retry-After', String(decision.retryAfterSeconds));
+        return sendConsentPage(
+          res,
+          429,
+          consentPageHtml(validation, params, {
+            requirePassword: true,
+            error: `Muitas tentativas. Tente novamente em ${decision.retryAfterSeconds}s.`,
+          }),
+        );
+      }
+      if (!ownerPasswordMatches(params.owner_password)) {
+        consentFailuresByIp.check(clientIp);
+        consentFailuresGlobal.check('global');
+        logger.warn('oauth_consent_bad_password', { client_id_prefix: validation.client.clientId.slice(0, 12) });
+        return sendConsentPage(
+          res,
+          401,
+          consentPageHtml(validation, params, { requirePassword: true, error: 'Senha incorreta.' }),
+        );
+      }
+    }
+    let code: string;
+    try {
+      code = deps.oauth.createAuthorizationCode({
+        clientId: validation.client.clientId,
+        redirectUri: validation.redirectUri,
+        codeChallenge: validation.codeChallenge,
+        scope: validation.scope,
+        subject: 'owner',
+      });
+    } catch (error) {
+      return oauthErrorResponse(res, error);
+    }
     const location = new URL(validation.redirectUri);
     location.searchParams.set('code', code);
     if (validation.state !== undefined) location.searchParams.set('state', validation.state);
@@ -519,8 +588,21 @@ function sendJsonRpc(
   sendJson(res, status, { jsonrpc: '2.0', id, error: { code, message } }, headers);
 }
 
-function sendHtml(res: ServerResponse, status: number, html: string): void {
-  res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' });
+/** Atrás do proxy do Fly o IP real vem em Fly-Client-IP (o proxy sobrescreve o header). */
+function clientAddress(req: IncomingMessage): string {
+  const flyIp = req.headers['fly-client-ip'];
+  if (typeof flyIp === 'string' && flyIp.length > 0) return flyIp;
+  return req.socket.remoteAddress ?? 'unknown';
+}
+
+function sendConsentPage(res: ServerResponse, status: number, html: string): void {
+  res.writeHead(status, {
+    'content-type': 'text/html; charset=utf-8',
+    'content-security-policy': CONSENT_CSP,
+    'x-frame-options': 'DENY',
+    'cache-control': 'no-store',
+    'referrer-policy': 'no-referrer',
+  });
   res.end(html);
 }
 
@@ -558,13 +640,20 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
 function consentPageHtml(
   validation: { client: { clientId: string; clientName?: string }; scope: string[] },
   params: Record<string, string>,
+  options: { requirePassword: boolean; error?: string },
 ): string {
   const clientLabel = validation.client.clientName ?? validation.client.clientId;
   const scopeItems = validation.scope
     .map((scope) => `<li><code>${escapeHtml(scope)}</code> — ${escapeHtml(SCOPE_DESCRIPTIONS[scope] ?? scope)}</li>`)
     .join('\n');
+  const errorBlock = options.error ? `<p class="error" role="alert">${escapeHtml(options.error)}</p>` : '';
+  const passwordField = options.requirePassword
+    ? `<label class="password">Senha do dono deste servidor
+      <input type="password" name="owner_password" autocomplete="current-password" />
+    </label>`
+    : '';
   const hidden = Object.entries(params)
-    .filter(([key]) => key !== 'decision')
+    .filter(([key]) => key !== 'decision' && key !== 'owner_password')
     .map(
       ([key, value]) =>
         `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}" />`,
@@ -584,6 +673,9 @@ function consentPageHtml(
     button { padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #d1d5db; cursor: pointer; font-size: 1rem; }
     button.approve { background: #111827; color: #fff; border-color: #111827; }
     .muted { color: #6b7280; font-size: 0.9rem; }
+    .error { color: #b91c1c; font-weight: 600; }
+    .password { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1rem; }
+    .password input { padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -593,8 +685,10 @@ function consentPageHtml(
     ${scopeItems}
   </ul>
   <p class="muted">O servidor fala apenas com o seu AnkiConnect local/self-hosted. Nenhum conteúdo de cartão é armazenado neste servidor.</p>
+  ${errorBlock}
   <form method="post" action="/oauth/approve">
     ${hidden}
+    ${passwordField}
     <button class="approve" type="submit" name="decision" value="approve">Autorizar</button>
     <button type="submit" name="decision" value="deny">Negar</button>
   </form>

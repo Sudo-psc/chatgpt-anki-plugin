@@ -64,14 +64,17 @@ export interface MockListenResult {
 }
 
 function parseQuery(query: string): ParsedQuery {
-  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
+  const tokens = query.match(/(?:[^\s"]+|"(?:[^"\\]|\\.)*")+/g) ?? [];
   const parsed: ParsedQuery = { states: [], tags: [], noteIds: [], cardIds: [], texts: [] };
   for (const raw of tokens) {
     const token = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
     const colon = token.indexOf(':');
     if (colon > 0) {
       const key = token.slice(0, colon).toLowerCase();
-      const value = token.slice(colon + 1).replace(/^"|"$/g, '');
+      const value = token
+        .slice(colon + 1)
+        .replace(/^"|"$/g, '')
+        .replace(/\\(.)/g, '$1');
       if (key === 'deck') parsed.deck = value;
       else if (key === 'tag') parsed.tags.push(value);
       else if (key === 'nid') parsed.noteIds.push(Number(value));

@@ -23,4 +23,12 @@ export class FixedWindowLimiter {
     window.count += 1;
     return { allowed: true };
   }
+
+  /** Consulta sem consumir: informa se a chave já esgotou a janela atual. */
+  blocked(key: string): RateLimitDecision {
+    const current = this.now();
+    const window = this.windows.get(key);
+    if (!window || window.resetAt <= current || window.count < this.limit) return { allowed: true };
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((window.resetAt - current) / 1000)) };
+  }
 }

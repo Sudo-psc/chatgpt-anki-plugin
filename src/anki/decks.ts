@@ -6,7 +6,8 @@ import type { AnkiDeckStatsWire } from './wire-types.js';
 
 /** Escapes a deck name for use inside an Anki search query. */
 export function deckQuery(name: string): string {
-  return `deck:"${name.replace(/"/g, '')}"`;
+  // `*` e `_` são curingas do Anki; `\` e `"` precisam de escape dentro de aspas.
+  return `deck:"${name.replace(/[\\"*_]/g, (char) => `\\${char}`)}"`;
 }
 
 export class DecksAdapter {

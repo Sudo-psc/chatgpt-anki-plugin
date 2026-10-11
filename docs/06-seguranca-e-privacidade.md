@@ -23,12 +23,20 @@ Documento de referência de segurança; política voltada ao usuário final em
   hospedados em `https://chatgpt.com/*` (ex.: `/connector/oauth/<id>`), que são
   o padrão do conector do ChatGPT; consentimento com escopos em pt-BR.
   Diagnóstico de rejeições de DCR é logado (`oauth_register_rejected`).
+- **Autenticação do dono no consentimento**: como o DCR é aberto, a fronteira
+  real é quem aprova. Com `OWNER_PASSWORD`, `/oauth/approve` só emite code com
+  a senha correta (comparação em tempo constante; só falhas contam: 10/min por
+  IP via `Fly-Client-IP` e 50/min no total, 429 acima disso — o dono que acerta
+  a senha de outro IP não é trancado por um atacante). Obrigatória em produção com `ANKI_BACKEND=connect`. A tela
+  de consentimento sai com `frame-ancestors 'none'`, `X-Frame-Options: DENY` e
+  `Cache-Control: no-store` (anti-clickjacking).
 - **Scopes por operação** (`anki:read|write|review|admin`), enforcement no
   handler de cada tool (ADR-0003); mapa completo em `05-tools-mcp.md`.
 - **Tokens**: HS256/`node:crypto`, TTL 1 h, claims `sub/scope/iss/aud/iat/exp`;
   rotação de `TOKEN_SECRET` invalida tudo (runbook).
 - **Dev token** (`MCP_DEV_TOKEN`) ignora OAuth por design — proibido em
-  produção (warn em log; documentado no `.env.example`).
+  produção: o servidor recusa iniciar com ele (ou com `AUTH_REQUIRED=false`)
+  quando `NODE_ENV=production`.
 
 ## Dados e privacidade (LGPD/GDPR)
 

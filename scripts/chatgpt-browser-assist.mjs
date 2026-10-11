@@ -13,7 +13,7 @@
  * Perfil persistente em ~/.cache/chatgpt-anki-plugin/browser-profile (login reutilizado).
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -464,6 +464,136 @@ if (PHASE === 'recon4') {
   process.exit(process.exitCode ?? 0);
 }
 
+if (PHASE === 'recon5') {
+  await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' });
+  if (!(await waitForLoggedIn(60 * 1000))) {
+    log('não está logado — rode a fase login primeiro.');
+    process.exitCode = 2;
+  } else {
+    const probe = await page.evaluate(() => {
+      const describe = (el) => ({
+        tag: el.tagName,
+        id: el.id,
+        cls: String(el.className).slice(0, 100),
+        role: el.getAttribute('role'),
+        ariaLabel: el.getAttribute('aria-label'),
+        placeholder: el.getAttribute('placeholder'),
+        contentEditable: el.getAttribute('contenteditable'),
+        testid: el.getAttribute('data-testid'),
+        visible: el.offsetParent !== null || el.getClientRects().length > 0,
+      });
+      return {
+        url: location.href,
+        textboxes: Array.from(document.querySelectorAll('[role="textbox"]')).slice(0, 10).map(describe),
+        textareas: Array.from(document.querySelectorAll('textarea')).slice(0, 10).map(describe),
+        contenteditables: Array.from(document.querySelectorAll('[contenteditable]')).slice(0, 10).map(describe),
+        sendButtons: Array.from(document.querySelectorAll('button'))
+          .filter((b) => /send|enviar/i.test(String(b.getAttribute('aria-label') ?? '') + ' ' + String(b.textContent ?? '')))
+          .slice(0, 6)
+          .map(describe),
+        floatingChat: document.querySelectorAll('[data-quick-chat-drag-handle]').length,
+      };
+    });
+    writeFileSync(path.join(SHOTS, 'recon5-dom.json'), JSON.stringify(probe, null, 2), 'utf8');
+    await shot('recon5-chat.png');
+    log('recon5 salvo em docs/evidencias/screenshots/recon5-dom.json');
+  }
+  await ctx.close();
+  process.exit(process.exitCode ?? 0);
+}
+
+if (PHASE === 'recon6') {
+  await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' });
+  if (!(await waitForLoggedIn(60 * 1000))) {
+    log('não está logado — rode a fase login primeiro.');
+    process.exitCode = 2;
+  } else {
+    const composer = page.locator('div[role="textbox"][contenteditable="true"]').first();
+    await composer.waitFor({ state: 'visible', timeout: 30_000 });
+    await composer.click();
+    await composer.type('Responda apenas com a palavra: OK', { delay: 20 });
+    await page.keyboard.press('Enter');
+    await sleep(12_000);
+    const probe = await page.evaluate(() => {
+      const testids = Array.from(new Set(Array.from(document.querySelectorAll('[data-testid]')).map((e) => e.getAttribute('data-testid')))).slice(0, 40);
+      const authorRoles = Array.from(document.querySelectorAll('[data-message-author-role]')).map((e) => e.getAttribute('data-message-author-role'));
+      const candidates = Array.from(document.querySelectorAll('div,section,article,li'))
+        .filter((el) => el.children.length <= 3 && /^OK\.?$/i.test(String(el.textContent ?? '').trim()))
+        .slice(0, 6)
+        .map((el) => ({
+          tag: el.tagName,
+          testid: el.getAttribute('data-testid'),
+          cls: String(el.className).slice(0, 90),
+          parentTestid: el.parentElement?.getAttribute('data-testid') ?? null,
+          parentCls: String(el.parentElement?.className ?? '').slice(0, 90),
+          grandparentTestid: el.parentElement?.parentElement?.getAttribute('data-testid') ?? null,
+          outer: el.outerHTML.slice(0, 260),
+        }));
+      return { url: location.href, testids, authorRoles, candidates };
+    });
+    writeFileSync(path.join(SHOTS, 'recon6-dom.json'), JSON.stringify(probe, null, 2), 'utf8');
+    await shot('recon6-chat.png');
+    log('recon6 salvo em docs/evidencias/screenshots/recon6-dom.json');
+  }
+  await ctx.close();
+  process.exit(process.exitCode ?? 0);
+}
+
+if (PHASE === 'prompts-extra') {
+  const PROMPT =
+    'Crie uma nota no conector "Anki (chatgpt-anki-plugin)": baralho Default, frente "Teste C10 final", verso "Ok". Sim, eu autorizo e confirmo a criação.';
+  const ASSISTANT_SELECTOR = 'div[data-markdown-text-style="assistant-message"]';
+  await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' });
+  if (!(await waitForLoggedIn(60 * 1000))) {
+    log('não está logado — rode a fase login primeiro.');
+    process.exitCode = 2;
+  } else {
+    const composer = page.locator('div[role="textbox"][contenteditable="true"], #prompt-textarea').first();
+    await composer.waitFor({ state: 'visible', timeout: 30_000 });
+    await composer.click();
+    await composer.type(PROMPT, { delay: 15 });
+    await page.keyboard.press('Enter');
+
+    const assistant = page.locator(ASSISTANT_SELECTOR);
+    const scrape = async () => {
+      const before = await assistant.count();
+      await page
+        .waitForFunction((arg) => document.querySelectorAll(arg.selector).length > arg.count, { selector: ASSISTANT_SELECTOR, count: before }, { timeout: 90_000 })
+        .catch(() => {});
+      let last = '';
+      for (let i = 0; i < 40; i += 1) {
+        const text = await assistant.last().innerText().catch(() => '');
+        if (text && text === last) break;
+        last = text;
+        await sleep(1500);
+      }
+      return last;
+    };
+
+    let last = await scrape();
+    // Se o modelo pediu confirmação, clica no botão inline ou responde autorizando.
+    if (/confirmar|autoriz|deseja que eu/i.test(last)) {
+      const confirmBtn = page.getByRole('button', { name: /confirmar.*(criar|nota|conexão)?|criar nota/i }).first();
+      if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await confirmBtn.click().catch(() => {});
+        await sleep(2500);
+      } else {
+        await composer.click();
+        await composer.type('Sim, confirmo: pode criar a nota agora no conector "Anki (chatgpt-anki-plugin)".', { delay: 15 });
+        await page.keyboard.press('Enter');
+      }
+      const second = await scrape();
+      last = `${last} ⟶ [CONFIRMAÇÃO ENVIADA PELO ROBÔ] ${second}`;
+    }
+    const summary = last.replace(/\s+/g, ' ').trim().slice(0, 600);
+    appendFileSync(TRANSCRIPT, `| 16 | \`create_note (autorizado)\` | ${PROMPT.replace(/\|/g, '\\|')} | ${summary.replace(/\|/g, '\\|') || '(sem resposta)'} |\n`, 'utf8');
+    await shot('c10-prompt-16-create-note.png');
+    log('prompts-extra concluído.');
+  }
+  await ctx.close();
+  process.exit(process.exitCode ?? 0);
+}
+
 if (PHASE === 'prompts') {
   const prompts = [
     ['list_decks', 'Quais baralhos eu tenho no meu Anki?'],
@@ -483,25 +613,35 @@ if (PHASE === 'prompts') {
     ['delete_deck', 'Apague o baralho ChatGPT::Teste2 (confirme a exclusão)'],
   ];
 
-  writeFileSync(
-    TRANSCRIPT,
-    `# Evidência C10 — ChatGPT developer mode (execução assistida)\n\n` +
-      `- **Data:** ${new Date().toISOString()}\n- **Endpoint:** ${MCP_URL}\n- **Robô:** scripts/chatgpt-browser-assist.mjs (Playwright, janela visível)\n\n` +
-      `| # | Tool | Prompt | Resposta (resumo) |\n|:--|:--|:--|:--|\n`,
-    'utf8',
-  );
+  const FROM = Number(process.env.PROMPT_FROM ?? 1);
+  const TO = Number(process.env.PROMPT_TO ?? prompts.length);
+  if (!existsSync(TRANSCRIPT)) {
+    writeFileSync(
+      TRANSCRIPT,
+      `# Evidência C10 — ChatGPT developer mode (execução assistida)\n\n` +
+        `- **Data:** ${new Date().toISOString()}\n- **Endpoint:** ${MCP_URL}\n- **Robô:** scripts/chatgpt-browser-assist.mjs (Playwright, janela visível)\n\n` +
+        `| # | Tool | Prompt | Resposta (resumo) |\n|:--|:--|:--|:--|\n`,
+      'utf8',
+    );
+  }
 
   await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' });
   if (!(await waitForLoggedIn(60 * 1000))) {
     log('não está logado — rode a fase login primeiro.');
     process.exitCode = 2;
   } else {
+    const existing = readFileSync(TRANSCRIPT, 'utf8');
     for (const [index, [tool, prompt]] of prompts.entries()) {
       const n = index + 1;
+      if (n < FROM || n > TO) continue;
+      if (new RegExp(`\\|\\s*${n}\\s*\\|`).test(existing)) {
+        log(`prompt ${n} já registrado — pulando.`);
+        continue;
+      }
       log(`prompt ${n}/${prompts.length} (${tool}): ${prompt}`);
       try {
         await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' }).catch(() => {});
-        const composer = page.locator('#prompt-textarea, div[contenteditable="true"]').first();
+        const composer = page.locator('div[role="textbox"][contenteditable="true"], #prompt-textarea').first();
         await composer.waitFor({ state: 'visible', timeout: 30_000 });
         await composer.click();
         await composer.type(prompt, { delay: 15 });
@@ -511,17 +651,19 @@ if (PHASE === 'prompts') {
         const useBtn = page.getByRole('button', { name: /use connector|usar connector|permitir|allow/i }).first();
         await useBtn.click({ timeout: 4000 }).catch(() => {});
 
-        const assistant = page.locator('div[data-message-author-role="assistant"]');
+        // UI 2026: mensagens do assistente ficam em [data-markdown-text-style="assistant-message"].
+        const ASSISTANT_SELECTOR = 'div[data-markdown-text-style="assistant-message"]';
+        const assistant = page.locator(ASSISTANT_SELECTOR);
         const before = await assistant.count();
         await page.waitForFunction(
-          (count) => document.querySelectorAll('div[data-message-author-role="assistant"]').length > count,
-          before,
-          { timeout: 90_000 },
+          (arg) => document.querySelectorAll(arg.selector).length > arg.count,
+          { selector: ASSISTANT_SELECTOR, count: before },
+          { timeout: 60_000 },
         ).catch(() => {});
 
         // Estabilidade do texto (streaming terminou)
         let last = '';
-        for (let i = 0; i < 60; i += 1) {
+        for (let i = 0; i < 30; i += 1) {
           const text = await assistant.last().innerText().catch(() => '');
           if (text && text === last) break;
           last = text;

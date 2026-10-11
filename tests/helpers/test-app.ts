@@ -89,6 +89,7 @@ export interface ObtainTokenOptions {
   scope?: string;
   clientId?: string;
   redirectUri?: string;
+  ownerPassword?: string;
 }
 
 export async function obtainToken(baseUrl: string, options: ObtainTokenOptions = {}): Promise<string> {
@@ -107,6 +108,7 @@ export async function obtainToken(baseUrl: string, options: ObtainTokenOptions =
     state: 'state-1',
     decision: 'approve',
   });
+  if (options.ownerPassword) approveParams.set('owner_password', options.ownerPassword);
   const approveResponse = await fetch(`${baseUrl}/oauth/approve`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },

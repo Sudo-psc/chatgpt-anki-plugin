@@ -94,6 +94,9 @@ export type AuthorizeValidation =
 
 const PKCE_CHALLENGE_RE = /^[A-Za-z0-9_-]{43,128}$/;
 
+/** Codes vivem 60s em memória; o teto impede crescimento ilimitado do Map. */
+const MAX_PENDING_CODES = 1_000;
+
 export interface OAuthServiceOptions {
   allowedRedirectUris: string[];
   defaultScopes: string[];
@@ -332,6 +335,13 @@ export class OAuthService {
     scope: string[];
     subject: string;
   }): string {
+    const current = this.now();
+    for (const [key, record] of this.codes) {
+      if (record.expiresAt <= current) this.codes.delete(key);
+    }
+    if (this.codes.size >= MAX_PENDING_CODES) {
+      throw new OAuthError('invalid_request', 'Too many pending authorization codes. Retry shortly.', 503);
+    }
     const code = randomBytes(32).toString('base64url');
     this.codes.set(code, {
       clientId: input.clientId,

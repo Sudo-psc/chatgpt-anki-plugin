@@ -7,7 +7,10 @@
 # Esta instância roda como DEMO pública (coleção 100% sintética; serve à revisão
 # da OpenAI e ao developer mode do ChatGPT). Para uso pessoal real, troque para o
 # backend connect apontando ANKI_CONNECT_URL ao seu AnkiConnect via túnel privado:
-#   fly secrets set ANKI_BACKEND=connect ANKI_CONNECT_URL=https://<tunel> ANKI_CONNECT_API_KEY=...
+#   fly secrets set ANKI_BACKEND=connect ANKI_CONNECT_URL=https://<tunel> ANKI_CONNECT_API_KEY=... \
+#     OWNER_PASSWORD="$(openssl rand -base64 18)"
+#   Sem OWNER_PASSWORD o servidor RECUSA iniciar com backend connect em produção
+#   (senão qualquer visitante aprova acesso ao seu Anki na tela de consentimento).
 #
 # LIMITAÇÃO DE ESCALA: códigos OAuth, clientes DCR e rate limit vivem em MEMÓRIA
 # do processo — mantenha UMA machine (fly scale count 1; já aplicado). Com 2+

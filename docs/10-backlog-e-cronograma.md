@@ -15,7 +15,7 @@ externa) · 🔜 roadmap (pós-v0.1).
 | M1 | Pesquisa | Dossiês OpenAI + Anki, matriz de viabilidade | C3, C4 | ✅ |
 | M2 | Especificação | Requisitos, arquitetura, contratos, testes | C2, C5, C6 | ✅ |
 | M3 | Núcleo | Adapter Anki + servidor MCP + auth | C7, C8 | ✅ (122 testes, cobertura 96,9%/92,3%) |
-| M4 | Interface | Widgets + fluxos de revisão e busca | C10 | 🟡 widgets ✅; developer mode ⛔ (conta ChatGPT) |
+| M4 | Interface | Widgets + fluxos de revisão e busca | C10 | ✅ widgets + developer mode executado (`docs/evidencias/C10-developer-mode.md`, 16 prompts, escrita autorizada) |
 | M5 | Produção | Deploy HTTPS, observabilidade, runbook | C9, C14 | ✅ `https://chatgpt-anki-mcp-sudo.fly.dev` (evidência `docs/evidencias/C9-deploy.md`) |
 | M6 | Publicação | Submissão e aprovação OpenAI | C11, C12 | ⛔ (conta OpenAI + revisão humana) |
 
@@ -116,12 +116,13 @@ e tools verificados E2E contra a instância real (`docs/evidencias/C9-deploy.md`
 
 **Pendências e bloqueios:**
 
-1. ⛔ **C10 (developer mode)**: endpoint público já pronto e testado; falta a
-   sessão ChatGPT do proprietário para conectar o connector e transcrever os
-   15 prompts (roteiro em `docs/09-*` §7 e `tests/e2e/chatgpt.developer-mode.spec.ts`).
+1. ✅ **C10 (developer mode) concluído em 2026-10-11**: connector criado, OAuth
+   conectado e 16 prompts executados com chamadas reais de tools (leitura + a
+   escrita `create_note` autorizada) — `docs/evidencias/C10-developer-mode.md`.
 2. ⛔ **T-049/T-050 (submissão OpenAI)**: requer conta OpenAI verificada
    (Owner) e revisão humana; pacote de submissão 100% preparado (`docs/09-*`)
-   — políticas já públicas via GitHub Pages.
+   — políticas já públicas via GitHub Pages. (Screenshots do widget: capturar
+   no portal de submissão; T-049.)
 3. 🔜 T-047/T-048: alertas e teste de carga (dependem de observabilidade externa).
 
 **Riscos abertos:** escala da instância é limitada a 1 machine enquanto os

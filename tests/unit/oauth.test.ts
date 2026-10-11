@@ -299,4 +299,14 @@ describe('OAuthService dynamic client registration', () => {
     const svc = service({ allowDcr: false });
     expect(() => svc.registerClient({ redirect_uris: [ALLOWED] })).toThrowError(/disabled/);
   });
+
+  it('purges expired codes and caps pending codes', () => {
+    let now = 1_700_000_000_000;
+    const svc = service({ now: () => now });
+    const input = { clientId: 'chatgpt', redirectUri: ALLOWED, codeChallenge: 'c'.repeat(43), scope: ['anki:read'], subject: 'owner' };
+    for (let i = 0; i < 1_000; i++) svc.createAuthorizationCode(input);
+    expect(() => svc.createAuthorizationCode(input)).toThrowError(OAuthError);
+    now += 61_000;
+    expect(() => svc.createAuthorizationCode(input)).not.toThrow();
+  });
 });

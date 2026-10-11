@@ -1,0 +1,32 @@
+{
+  "url": "https://chatgpt.com/",
+  "textboxes": [
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "ProseMirror ProseMirror-focused",
+      "role": "textbox",
+      "ariaLabel": "Pergunte ao ChatGPT",
+      "placeholder": null,
+      "contentEditable": "true",
+      "testid": null,
+      "visible": true
+    }
+  ],
+  "textareas": [],
+  "contenteditables": [
+    {
+      "tag": "DIV",
+      "id": "",
+      "cls": "ProseMirror ProseMirror-focused",
+      "role": "textbox",
+      "ariaLabel": "Pergunte ao ChatGPT",
+      "placeholder": null,
+      "contentEditable": "true",
+      "testid": null,
+      "visible": true
+    }
+  ],
+  "sendButtons": [],
+  "floatingChat": 0
+}

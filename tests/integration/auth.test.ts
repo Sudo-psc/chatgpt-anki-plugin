@@ -291,3 +291,99 @@ describe('scope enforcement per operation (C7)', () => {
     expect(allowed.isError).toBe(false);
   });
 });
+
+describe('resource-owner authentication on consent (C7)', () => {
+  const OWNER_PASSWORD = 'correct-horse-battery-staple';
+
+  function consentParams(challenge: string, extra: Record<string, string> = {}): URLSearchParams {
+    return new URLSearchParams({
+      client_id: 'chatgpt',
+      redirect_uri: 'http://localhost:3000/callback',
+      response_type: 'code',
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      scope: 'anki:read',
+      state: 's1',
+      ...extra,
+    });
+  }
+
+  async function approve(baseUrl: string, params: URLSearchParams): Promise<Response> {
+    return fetch(`${baseUrl}/oauth/approve`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: params,
+      redirect: 'manual',
+    });
+  }
+
+  it('refuses to issue a code when the owner password is missing or wrong', async () => {
+    app = await startTestApp({ env: { OWNER_PASSWORD } });
+    const { challenge } = pkcePair();
+    const missing = await approve(app.baseUrl, consentParams(challenge, { decision: 'approve' }));
+    expect(missing.status).toBe(401);
+    expect(missing.headers.get('location')).toBeNull();
+    const wrong = await approve(app.baseUrl, consentParams(challenge, { decision: 'approve', owner_password: 'nope' }));
+    expect(wrong.status).toBe(401);
+    expect(await wrong.text()).toContain('Senha incorreta');
+  });
+
+  it('issues a code when the owner password is correct', async () => {
+    app = await startTestApp({ env: { OWNER_PASSWORD } });
+    const token = await obtainToken(app.baseUrl, { ownerPassword: OWNER_PASSWORD });
+    await initializeMcp(app.baseUrl, token);
+    const result = await callTool(app.baseUrl, token, 'list_decks', {});
+    expect(result.isError).toBe(false);
+  });
+
+  it('lets the visitor deny without the password', async () => {
+    app = await startTestApp({ env: { OWNER_PASSWORD } });
+    const { challenge } = pkcePair();
+    const deny = await approve(app.baseUrl, consentParams(challenge, { decision: 'deny' }));
+    expect(deny.status).toBe(302);
+    expect(deny.headers.get('location')).toContain('error=access_denied');
+  });
+
+  it('throttles repeated wrong passwords', async () => {
+    app = await startTestApp({ env: { OWNER_PASSWORD } });
+    const { challenge } = pkcePair();
+    let last: Response | undefined;
+    for (let i = 0; i < 12; i++) {
+      last = await approve(app.baseUrl, consentParams(challenge, { decision: 'approve', owner_password: `bad-${i}` }));
+    }
+    expect(last?.status).toBe(429);
+    expect(last?.headers.get('x-frame-options')).toBe('DENY');
+    expect(last?.headers.get('retry-after')).not.toBeNull();
+  });
+
+  it('does not lock the owner out from another IP, and correct attempts do not consume the quota', async () => {
+    app = await startTestApp({ env: { OWNER_PASSWORD } });
+    const { challenge } = pkcePair();
+    const fromIp = (ip: string, extra: Record<string, string>): Promise<Response> =>
+      fetch(`${app!.baseUrl}/oauth/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'fly-client-ip': ip },
+        body: consentParams(challenge, { decision: 'approve', ...extra }),
+        redirect: 'manual',
+      });
+    for (let i = 0; i < 12; i++) await fromIp('203.0.113.9', { owner_password: `bad-${i}` });
+    expect((await fromIp('203.0.113.9', { owner_password: OWNER_PASSWORD })).status).toBe(429);
+
+    for (let i = 0; i < 15; i++) {
+      const ok = await fromIp('198.51.100.7', { owner_password: OWNER_PASSWORD });
+      expect(ok.status).toBe(302);
+      expect(ok.headers.get('location')).toContain('code=');
+    }
+  });
+
+  it('renders the consent page with a password field and anti-framing headers', async () => {
+    app = await startTestApp({ env: { OWNER_PASSWORD } });
+    const { challenge } = pkcePair();
+    const page = await fetch(`${app.baseUrl}/oauth/authorize?${consentParams(challenge)}`);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain('name="owner_password"');
+    expect(page.headers.get('x-frame-options')).toBe('DENY');
+    expect(page.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+    expect(page.headers.get('cache-control')).toBe('no-store');
+  });
+});

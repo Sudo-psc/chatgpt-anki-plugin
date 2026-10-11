@@ -1,0 +1,64 @@
+{
+  "url": "https://chatgpt.com/c/6acb06c8-2008-83e9-84d3-ee3843786163",
+  "testids": [
+    "app-shell-header-context-menu-surface",
+    "avatar-overlay-voice-orb"
+  ],
+  "authorRoles": [],
+  "candidates": [
+    {
+      "tag": "DIV",
+      "testid": null,
+      "cls": "",
+      "parentTestid": null,
+      "parentCls": "",
+      "grandparentTestid": null,
+      "outer": "<div><div class=\"group flex min-w-0 flex-col\" data-chatgpt-selection-conversation-id=\"local-chatgpt:94a812ec-335e-4444-812a-c0403f8f1aaf\" data-chatgpt-selection-message-id=\"59ba3d8a-39f0-4dc4-ad0f-4f7db0c4c860\"><span hidden=\"\"></span><div data-selected-text-ov"
+    },
+    {
+      "tag": "DIV",
+      "testid": null,
+      "cls": "group flex min-w-0 flex-col",
+      "parentTestid": null,
+      "parentCls": "",
+      "grandparentTestid": null,
+      "outer": "<div class=\"group flex min-w-0 flex-col\" data-chatgpt-selection-conversation-id=\"local-chatgpt:94a812ec-335e-4444-812a-c0403f8f1aaf\" data-chatgpt-selection-message-id=\"59ba3d8a-39f0-4dc4-ad0f-4f7db0c4c860\"><span hidden=\"\"></span><div data-selected-text-overlay"
+    },
+    {
+      "tag": "DIV",
+      "testid": null,
+      "cls": "MarkdownRoot-rZKhxa [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>*:last-child]:mb-0 [&>",
+      "parentTestid": null,
+      "parentCls": "group flex min-w-0 flex-col",
+      "grandparentTestid": null,
+      "outer": "<div data-selected-text-overlay-target=\"_r_dr_\" dir=\"auto\" data-markdown-text-style=\"assistant-message\" class=\"MarkdownRoot-rZKhxa [&amp;&gt;*:first-child]:mt-0 [&amp;&gt;*:last-child]:mb-0 [&amp;&gt;*:last-child]:mb-0 [&amp;&gt;ol:first-child]:mt-0 [&amp;&gt;"
+    },
+    {
+      "tag": "DIV",
+      "testid": null,
+      "cls": "my-4 first:mt-0 last:mb-0 empty:hidden",
+      "parentTestid": null,
+      "parentCls": "MarkdownRoot-rZKhxa [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>*:last-child]:mb-0 [&>",
+      "grandparentTestid": null,
+      "outer": "<div class=\"my-4 first:mt-0 last:mb-0 empty:hidden\" data-dil-source-message-id=\"59ba3d8a-39f0-4dc4-ad0f-4f7db0c4c860\" data-chatgpt-copy-reference=\"0\" data-markdown-copy=\"contents\"><div class=\"[--entity-prose-inset:0px]\"><div hidden=\"\"></div><div class=\"relativ"
+    },
+    {
+      "tag": "DIV",
+      "testid": null,
+      "cls": "[--entity-prose-inset:0px]",
+      "parentTestid": null,
+      "parentCls": "my-4 first:mt-0 last:mb-0 empty:hidden",
+      "grandparentTestid": null,
+      "outer": "<div class=\"[--entity-prose-inset:0px]\"><div hidden=\"\"></div><div class=\"relative PortalBoundary-TFj9W2 Renderer-ojZscX\" data-theme=\"light\" style=\"--puik-portal-zoom: 1;\"><div dir=\"auto\" class=\"DilRenderer-tB76Jj DilResponseRoot-HfQrEh Reveal-k2IWvM\" data-d-in"
+    },
+    {
+      "tag": "DIV",
+      "testid": null,
+      "cls": "relative PortalBoundary-TFj9W2 Renderer-ojZscX",
+      "parentTestid": null,
+      "parentCls": "[--entity-prose-inset:0px]",
+      "grandparentTestid": null,
+      "outer": "<div class=\"relative PortalBoundary-TFj9W2 Renderer-ojZscX\" data-theme=\"light\" style=\"--puik-portal-zoom: 1;\"><div dir=\"auto\" class=\"DilRenderer-tB76Jj DilResponseRoot-HfQrEh Reveal-k2IWvM\" data-d-inline-reveal=\"\" data-d-direction=\"col\" data-dil-message-id=\"59"
+    }
+  ]
+}
