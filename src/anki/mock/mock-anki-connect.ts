@@ -330,7 +330,7 @@ export class MockAnkiConnect {
         for (const name of requested) {
           const id = this.decks.get(name);
           if (id === undefined) continue;
-          out[String(id)] = { deck_id: id, name, ...this.deckCounts(name) };
+          out[String(id)] = { deck_id: id, name: name.split('::').pop() ?? name, ...this.deckCounts(name) };
         }
         return out;
       }

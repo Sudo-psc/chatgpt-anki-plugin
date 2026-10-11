@@ -45,7 +45,8 @@ export class ReviewAdapter {
       const statsMap = await this.client.invoke<Record<string, AnkiDeckStatsWire>>('getDeckStats', {
         decks: [deck],
       });
-      const stats = Object.values(statsMap).find((item) => item.name === deck);
+      // Um único deck pedido ⇒ um único item no mapa (chaveado por id); `{}` se não existir.
+      const stats = Object.values(statsMap)[0];
       if (stats) {
         result.deckStats = {
           newCount: stats.new_count,
