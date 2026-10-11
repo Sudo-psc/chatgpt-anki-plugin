@@ -84,7 +84,7 @@ Para respeitar integralmente os Termos de Uso do AnkiWeb e da OpenAI e ainda ass
 * [`01-requisitos-funcionais.md`](./01-requisitos-funcionais.md) — Requisitos funcionais (`RF-001` a `RF-015`) com critérios de aceite testáveis.
 * [`02-requisitos-nao-funcionais.md`](./02-requisitos-nao-funcionais.md) — Requisitos não funcionais (`RNF-001` a `RNF-012`).
 * [`03-arquitetura.md`](./03-arquitetura.md) — Dossiê técnico Anki/AnkiConnect/FSRS, arquitetura em camadas e fluxos de dados.
-* [`04-adr/`](./04-adr/) — Registros de Decisão de Arquitetura (`ADR-0001` a `ADR-0006`).
+* [`04-adr/`](./04-adr/) — Registros de Decisão de Arquitetura (`ADR-0001` a `ADR-0007`).
 * [`05-tools-mcp.md`](./05-tools-mcp.md) — Contrato completo das 13 tools MCP, schemas, anotações e erros.
 * [`06-seguranca-e-privacidade.md`](./06-seguranca-e-privacidade.md) — Threat model, OAuth 2.1 + PKCE, LGPD/GDPR, Política de Privacidade e Termos de Uso.
 * [`07-plano-de-testes.md`](./07-plano-de-testes.md) — Estratégia de testes (unitários, integração, contrato, E2E Playwright e cobertura).

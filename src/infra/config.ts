@@ -25,6 +25,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(0).max(65535).default(3000),
   HOST: z.string().min(1).default('127.0.0.1'),
   PUBLIC_BASE_URL: z.string().url().optional(),
+  RENDER_EXTERNAL_URL: z.string().url().optional(),
   ANKI_BACKEND: z.enum(['ankiconnect', 'bridge', 'memory']).default('ankiconnect'),
   ANKICONNECT_URL: z.string().url().default('http://127.0.0.1:8765'),
   ANKICONNECT_API_KEY: z.string().optional(),
@@ -69,7 +70,11 @@ export function assertHttpSecurity(config: AppConfig): void {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.parse(env);
-  const publicBaseUrl = (parsed.PUBLIC_BASE_URL ?? `http://${parsed.HOST}:${parsed.PORT}`).replace(/\/+$/, '');
+  const publicBaseUrl = (
+    parsed.PUBLIC_BASE_URL ??
+    parsed.RENDER_EXTERNAL_URL ??
+    `http://${parsed.HOST}:${parsed.PORT}`
+  ).replace(/\/+$/, '');
   const oauthIssuer = (parsed.OAUTH_ISSUER ?? publicBaseUrl).replace(/\/+$/, '');
 
   const config: AppConfig = {

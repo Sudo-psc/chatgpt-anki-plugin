@@ -69,6 +69,29 @@ export function createHttpApp(options: {
   });
   app.use(apiLimiter);
 
+  // Root landing page so visiting https://<host>/ in a browser confirms all endpoints
+  app.get('/', async (_req: Request, res: Response): Promise<void> => {
+    const ankiHealth = await anki.checkHealth();
+    res.status(200).json({
+      service: SERVER_NAME,
+      version: SERVER_VERSION,
+      status: 'ok',
+      endpoints: {
+        mcp: `${config.publicBaseUrl}/mcp`,
+        health: `${config.publicBaseUrl}/health`,
+        oauthProtectedResource: `${config.publicBaseUrl}/.well-known/oauth-protected-resource`,
+        oauthAuthorizationServer: `${config.publicBaseUrl}/.well-known/oauth-authorization-server`,
+        privacy: `${config.publicBaseUrl}/privacy`,
+        terms: `${config.publicBaseUrl}/terms`,
+        bridgeWebSocket: `${config.publicBaseUrl.replace(/^http/, 'ws')}/bridge`,
+      },
+      anki: {
+        ...ankiHealth,
+        bridgeConnected: bridgeAdapter?.isBridgeConnected() ?? false,
+      },
+    });
+  });
+
   // Healthcheck endpoints (C9: /health and /healthz)
   const handleHealth = async (_req: Request, res: Response): Promise<void> => {
     const ankiHealth = await anki.checkHealth();

@@ -8,7 +8,9 @@
 * **Build your MCP Server**: <https://developers.openai.com/apps-sdk/build/mcp-server>
 * **Custom UX & Widgets (`window.openai`)**: <https://developers.openai.com/apps-sdk/build/custom-ux>
 * **Authentication (OAuth 2.1 + PKCE)**: <https://developers.openai.com/apps-sdk/build/auth>
-* **App Submission Guidelines & Review**: <https://developers.openai.com/apps-sdk/App-Submission-Guidelines>
+* **App Submission Guidelines & Review**: <https://developers.openai.com/apps-sdk/app-submission-guidelines>
+* **Submit your app (portal de plugins)**: <https://developers.openai.com/apps-sdk/deploy/submission>
+* **Documentação de Plugins (visão oficial)**: <https://developers.openai.com/plugins>
 * **Model Context Protocol Specification (2025-03-26 / 2025-06-18)**: <https://modelcontextprotocol.io/specification>
 
 ### 1.1 Requisitos Técnicos Verificados
@@ -39,15 +41,27 @@
      * `https://platform.openai.com/apps-manage/oauth`
    * Quando não autenticado, `POST /mcp` deve retornar `401 Unauthorized` com header `WWW-Authenticate: Bearer resource_metadata="https://<host>/.well-known/oauth-protected-resource"`.
 
+### 1.2 Nomenclatura e Requisitos do Fluxo de Plugins (2026)
+
+A documentação oficial estruturou a distribuição em dois níveis: o **app** (a capacidade MCP, com UI opcional via Apps SDK) e o **plugin** (o pacote que o usuário descobre, instala e que é submetido/publicado — *"apps are now submitted and published as plugins"*). Requisitos adicionais de submissão verificados em 2026-10:
+
+* **Domínio público obrigatório**: MCP server hospedado em domínio público com TLS válido (sem endpoints locais ou de teste).
+* **CSP explícita**: declarar exatamente os domínios externos acessados pelo app — obrigatório para aprovação de segurança.
+* **Conta de demonstração**: apps autenticados devem fornecer login/senha de conta plena, sem cadastro novo nem 2FA inacessível (atendido pelo backend `memory` + `OAUTH_AUTHORIZE_PIN`).
+* **Uma versão em revisão por vez**; nomes, assinaturas e descrições de tools ficam **travados após a publicação** — alterações exigem resubmissão.
+* **Data residency UE**: projetos com residência de dados na UE não podem submeter; usar projeto com data residency global.
+* Estratégia e consequências dessas regras: **ADR-0007**.
+
 ---
 
 ## 2. Como Testar no ChatGPT em *Developer Mode* (Critério C10)
 
-1. No ChatGPT (Plus, Pro, Team ou Enterprise), acesse **Settings → Apps & Connectors → Advanced → Developer Mode** e ative **Developer Mode**.
-2. Clique em **Create / Connect App**:
+1. No ChatGPT (Plus, Pro, Team ou Enterprise), habilite o **Developer Mode** em **Settings → Plugins** (ou direto em `chatgpt.com/plugins`; em algumas contas o rótulo ainda aparece como **Apps & Connectors** durante a transição).
+2. Crie o app de desenvolvimento (botão **+**) informando os metadados:
    * **Name**: `Anki Flashcards`
    * **MCP Server URL**: `https://<SEU-SERVICO>.onrender.com/mcp`
    * **Authentication**: `OAuth` (descoberta automática via `/.well-known/oauth-protected-resource`).
+   * Alternativa para uso pessoal sem servidor público: criar o app com **Secure MCP Tunnel** (opção de túnel na criação) apontando para a instância local.
 3. Na tela de autorização OAuth (`/oauth/authorize`), informe o PIN configurado em `OAUTH_AUTHORIZE_PIN` e aprove os escopos (`anki:read`, `anki:write`, `anki:review`, `anki:delete`).
 4. Execute os prompts de validação E2E das 13 tools:
    * *"Liste todos os meus baralhos do Anki."* → `list_decks` + widget `deck-browser.html`
@@ -110,4 +124,4 @@ Para concluir o envio administrativo no painel da OpenAI (`https://platform.open
 
 1. Concluir a **Verificação de Organização (Organization Verification)** na conta OpenAI Platform (exige documento de identidade do titular no painel da OpenAI).
 2. Conectar o repositório `https://github.com/Sudo-psc/chatgpt-anki-plugin` no painel do **Render** (`New → Blueprint`) para ativar a URL pública `https://<service>.onrender.com`.
-3. Submeter o pacote da Seção 3 no formulário **Submit App for Review** da OpenAI.
+3. Submeter o pacote da Seção 3 pelo portal de submissão de plugins (`https://platform.openai.com/apps-manage` → **Submit for review**) — o pacote submetido e publicado é um **plugin** (ver **ADR-0007**). Após aprovação, clicar em **Publish** para listagem no diretório. Atualizações posteriores exigem resubmissão (tools ficam travados após a publicação).

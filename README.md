@@ -74,8 +74,8 @@ curl http://127.0.0.1:3000/health
    npx chatgpt-anki-plugin bridge --server wss://<SEU-APP>.onrender.com/bridge --token <BRIDGE_SHARED_TOKEN>
    ```
 3. No **ChatGPT (Plus / Pro / Team / Enterprise)**:
-   * Ative **Settings → Apps & Connectors → Advanced → Developer Mode**.
-   * Adicione o conector com a URL `https://<SEU-APP>.onrender.com/mcp` e autentique via OAuth 2.1 usando o seu `OAUTH_AUTHORIZE_PIN`.
+   - Habilite o **Developer Mode** em **Settings → Plugins** (ou direto em `chatgpt.com/plugins`; em algumas contas o rótulo ainda aparece como **Apps & Connectors** durante a transição).
+   - Crie um app de desenvolvimento (botão **+**) com a URL `https://<SEU-APP>.onrender.com/mcp` e autentique via OAuth 2.1 usando o seu `OAUTH_AUTHORIZE_PIN`. Alternativa sem servidor público: criar o app com **Secure MCP Tunnel** apontando para a instância local.
 
 ---
 
@@ -89,7 +89,7 @@ chatgpt-anki-plugin/
 │  ├─ 01-requisitos-funcionais.md
 │  ├─ 02-requisitos-nao-funcionais.md
 │  ├─ 03-arquitetura.md
-│  ├─ 04-adr/                  # ADR-0001 a ADR-0006
+│  ├─ 04-adr/                  # ADR-0001 a ADR-0007
 │  ├─ 05-tools-mcp.md          # Contrato detalhado das 13 tools MCP
 │  ├─ 06-seguranca-e-privacidade.md
 │  ├─ 07-plano-de-testes.md
