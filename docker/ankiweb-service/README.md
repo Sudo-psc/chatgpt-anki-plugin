@@ -90,6 +90,25 @@ Docker local equivalente: `docker cp anki-profile.tgz <container>:/tmp/` +
 - **Backup**: continue exportando sua coleção periodicamente (`Arquivo → Exportar`).
 - **Smoke sem AnkiWeb**: `DISABLE_SYNC_LOOP=1` + perfil vazio ⇒ coleção nova com deck `Default` — usado nos testes do repo (`docs/07-plano-de-testes.md`).
 
+## 5.1 Troubleshooting (aprendizados de produção, 2026-10-11)
+
+Três problemas reais foram encontrados e resolvidos no primeiro deploy (todas
+as correções já estão na imagem):
+
+| Sintoma | Causa | Correção (no repo) |
+|:---|:---|:---|
+| `xvfb-run: error: xauth command not found` | pacote ausente | `xauth` no `apt-get` do Dockerfile |
+| Anki crasha com `lang_to_disk_lang(None)` em `setupLangAndBackend` | perfil criado via API **sem** a chave `defaultLang` no meta | entrypoint grava o meta direto no `prefs21.db` (pickle de dict, mesmo formato do Anki) |
+| `Running as root without --no-sandbox is not supported` (QtWebEngine) | Anki renderiza webviews; sandbox recusa root | `QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu"` no Dockerfile |
+
+Notas operacionais relacionadas:
+- Perfil inexistente faz o Anki abrir o diálogo de seleção (modal) e o
+  AnkiConnect nunca sobe → o entrypoint cria/conserta o perfil a cada boot.
+- `DEBUG_HOLD=1` mantém o container em repouso (com `/health` verde) para
+  depuração via `fly ssh` — útil para diagnosticar sem o supervisor de prontidão.
+- O supervisor reinicia o Anki sozinho até `ANKI_RELAUNCH_MAX` (5) vezes antes
+  de derrubar o container (evita crash-loops longos).
+
 ## 6. Segurança
 
 - AnkiConnect só escuta em `127.0.0.1` dentro da própria máquina.

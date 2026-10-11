@@ -41,7 +41,7 @@ FROM debian:bookworm-slim AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils zstd xvfb tini \
+      ca-certificates curl xz-utils zstd xvfb xauth tini \
       libasound2 libdbus-1-3 libegl1 libfontconfig1 libfreetype6 libgbm1 libgl1 \
       libglib2.0-0 libnss3 libpulse0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 \
       libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
@@ -91,7 +91,12 @@ ENV ANKI_BASE=/data \
     PORT=8080 \
     HOST=0.0.0.0 \
     NODE_ENV=production \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    TINI_SUBREAPER=1 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    # QtWebEngine (webviews do Anki) não aceita sandbox como root; GPU off p/ Xvfb.
+    QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu"
 
 VOLUME ["/data"]
 EXPOSE 8080
