@@ -99,7 +99,7 @@ externa) · 🔜 roadmap (pós-v0.1).
 | ID | Tarefa | Depende | Agente | Est. | Entregável |
 |:---|:---|:---|:---|:---|:---|
 | R-01 | **Multi-tenant** (T-048 do ADR-0008): AnkiConnect URL/chave por usuário, cifrado (AES-GCM), consentimento | T-024 | Arquiteto+Segurança | 40h | habilita listagem pública plena |
-| R-02 | Backend headless do AnkiGateway (container Anki + API) | T-018 | Dev Backend | 24h | **Entregue como microsserviço**: `docker/ankiweb-service` + `fly.ankiweb.toml` + ADR-0009 (Anki headless syncado ao AnkiWeb + MCP na mesma máquina); ativação real pendente de custo/perfil |
+| R-02 | Backend headless do AnkiGateway (container Anki + API) | T-018 | Dev Backend | 24h | **Entregue e ATIVO** (2026-10-11): `docker/ankiweb-service` + `fly.ankiweb.toml` + ADR-0009; rodando em `chatgpt-anki-real` com a conta AnkiWeb real (77 baralhos, sync 15 min) e conector `Anki (Minha Coleção)` no ChatGPT |
 | R-03 | Rate limit distribuído (Redis) p/ múltiplas instâncias | T-027 | DevOps | 8h | escala horizontal |
 | R-04 | Import/export `.apkg` (FR-15) | T-031 | Dev Backend | 16h | novos fluxos |
 | R-05 | Refresh tokens OAuth | T-024 | Segurança | 8h | UX de longa duração |

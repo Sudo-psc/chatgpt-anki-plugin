@@ -22,9 +22,8 @@ primary_region = 'gru'
   ANKI_BACKEND = 'connect'
   ANKI_CONNECT_URL = 'http://127.0.0.1:8765'
   SYNC_INTERVAL_SECONDS = '900'
-  # Nome do perfil Anki copiado para o volume (ex.: 'Philipe'). Deixe vazio
-  # para usar o perfil padrão criado pelo Anki.
-  # ANKI_PROFILE = 'Philipe'
+  # Nome exato do perfil Anki copiado para o volume.
+  ANKI_PROFILE = 'Usuário 1'
 
 [[mounts]]
   source = 'anki_data'

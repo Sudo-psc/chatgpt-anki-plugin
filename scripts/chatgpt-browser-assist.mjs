@@ -20,16 +20,30 @@ import path from 'node:path';
 const PHASE = process.argv[2] ?? 'login';
 const MCP_URL = process.env.MCP_URL ?? 'https://chatgpt-anki-mcp-sudo.fly.dev/mcp';
 const CONNECTOR_NAME = process.env.CONNECTOR_NAME ?? 'Anki (chatgpt-anki-plugin)';
+const OWNER_PASSWORD = process.env.OWNER_PASSWORD;
 const PROFILE = path.join(homedir(), '.cache', 'chatgpt-anki-plugin', 'browser-profile');
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
 const EVID = path.join(ROOT, 'docs', 'evidencias');
 const SHOTS = path.join(EVID, 'screenshots');
-const TRANSCRIPT = path.join(EVID, 'C10-developer-mode.md');
+const TRANSCRIPT = path.join(EVID, process.env.TRANSCRIPT_FILE ?? 'C10-developer-mode.md');
 mkdirSync(PROFILE, { recursive: true });
 mkdirSync(SHOTS, { recursive: true });
 
 const log = (msg) => console.log(`[assist] ${msg}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Aprova o consentimento OAuth da NOSSA página: preenche a OWNER_PASSWORD
+ * (gate de segurança) quando presente e clica em Autorizar.
+ */
+async function approveConsent(p) {
+  const pwField = p.locator('input[name="owner_password"]').first();
+  if (OWNER_PASSWORD && (await pwField.isVisible({ timeout: 3000 }).catch(() => false))) {
+    await pwField.fill(OWNER_PASSWORD).catch(() => {});
+    log('OWNER_PASSWORD preenchida na página de consentimento.');
+  }
+  await p.getByRole('button', { name: /Autorizar/i }).click({ timeout: 15000 });
+}
 
 const ctx = await chromium.launchPersistentContext(PROFILE, {
   headless: false,
@@ -45,7 +59,7 @@ ctx.on('page', (p) => {
       await p.waitForLoadState('domcontentloaded').catch(() => {});
       if (p.url().includes('/oauth/authorize')) {
         log('página de consentimento OAuth detectada — aprovando...');
-        await p.getByRole('button', { name: /Autorizar/i }).click({ timeout: 15000 });
+        await approveConsent(p);
         consentApproved = true;
         log('consentimento aprovado.');
       }
@@ -378,20 +392,14 @@ if (PHASE === 'connect') {
     log('não está logado — rode a fase login primeiro.');
     process.exitCode = 2;
   } else {
-    const connectorUrl =
-      process.env.CONNECTOR_URL ?? 'https://chatgpt.com/plugins/plugin_asdk_app_6acafe0bfe30819180cc0183ecdf3de1';
-    await page.goto(connectorUrl, { waitUntil: 'domcontentloaded' }).catch(() => {});
-    await sleep(7000);
-    const bodyText = await page.locator('body').innerText().catch(() => '');
-    if (!/anki \(chatgpt-anki-plugin\)/i.test(bodyText)) {
-      await page.goto('https://chatgpt.com/plugins', { waitUntil: 'domcontentloaded' });
-      await sleep(3500);
-      await page.getByText('Anki (chatgpt-anki-plugin)', { exact: true }).first().click({ timeout: 8000 }).catch((e) => log(`clique no plugin: ${e.message}`));
-      await sleep(8000);
-    }
+    await page.goto('https://chatgpt.com/plugins', { waitUntil: 'domcontentloaded' });
+    await sleep(3500);
+    // Abre SEMPRE o plugin certo clicando no item da sidebar (o body inteiro contém todos os nomes).
+    await page.getByText(CONNECTOR_NAME, { exact: true }).first().click({ timeout: 8000 }).catch((e) => log(`clique no plugin: ${e.message}`));
+    await sleep(8000);
     await shot('c10-06-plugin-aberto.png');
 
-    const connectBtn = page.getByRole('button', { name: /^conectar$/i }).first();
+    const connectBtn = page.getByRole('button', { name: /^(conectar|connect|autorizar|reconectar)$/i }).first();
     if (await connectBtn.isVisible({ timeout: 6000 }).catch(() => false)) {
       await connectBtn.click().catch((e) => log(`Conectar: ${e.message}`));
       log('cliquei "Conectar".');
@@ -415,6 +423,11 @@ if (PHASE === 'connect') {
       if (page.url().includes('/oauth/authorize')) {
         const autorizar = page.getByRole('button', { name: /autorizar/i }).first();
         if (await autorizar.isVisible({ timeout: 3000 }).catch(() => false)) {
+          const pwField = page.locator('input[name="owner_password"]').first();
+          if (OWNER_PASSWORD && (await pwField.isVisible({ timeout: 1500 }).catch(() => false))) {
+            await pwField.fill(OWNER_PASSWORD).catch(() => {});
+            log('OWNER_PASSWORD preenchida (aba de consentimento).');
+          }
           await autorizar.click().catch(() => {});
           consentApproved = true;
         }
@@ -597,8 +610,8 @@ if (PHASE === 'prompts-extra') {
 if (PHASE === 'prompts') {
   const prompts = [
     ['list_decks', 'Quais baralhos eu tenho no meu Anki?'],
-    ['get_deck', 'Me mostre os detalhes e estatísticas do baralho Estudos::Anatomia'],
-    ['search_cards', 'Busque meus cartões com a tag farmacologia'],
+    ['get_deck', 'Me mostre os detalhes e estatísticas do baralho Superfície Ocular::Olho Seco'],
+    ['search_cards', 'Busque meus cartões sobre olho seco'],
     ['get_due_cards', 'Quais cartões estão vencidos hoje no meu Anki?'],
     ['get_card', 'Mostre em detalhe o primeiro cartão vencido da minha lista'],
     ['submit_review', 'Dê a nota "good" nesse primeiro cartão vencido'],
@@ -612,6 +625,7 @@ if (PHASE === 'prompts') {
     ['delete_note', 'Apague a nota "Teste C10" (confirme a exclusão)'],
     ['delete_deck', 'Apague o baralho ChatGPT::Teste2 (confirme a exclusão)'],
   ];
+  const READ_ONLY_TOOLS = new Set(['list_decks', 'get_deck', 'search_cards', 'get_due_cards', 'get_card', 'get_stats', 'manage_tags']);
 
   const FROM = Number(process.env.PROMPT_FROM ?? 1);
   const TO = Number(process.env.PROMPT_TO ?? prompts.length);
@@ -634,6 +648,10 @@ if (PHASE === 'prompts') {
     for (const [index, [tool, prompt]] of prompts.entries()) {
       const n = index + 1;
       if (n < FROM || n > TO) continue;
+      if (process.env.PROMPTS_READONLY === '1' && !READ_ONLY_TOOLS.has(tool)) {
+        log(`prompt ${n} (${tool}) pulado — modo somente-leitura.`);
+        continue;
+      }
       if (new RegExp(`\\|\\s*${n}\\s*\\|`).test(existing)) {
         log(`prompt ${n} já registrado — pulando.`);
         continue;
@@ -641,8 +659,14 @@ if (PHASE === 'prompts') {
       log(`prompt ${n}/${prompts.length} (${tool}): ${prompt}`);
       try {
         await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded' }).catch(() => {});
+        // Espera gerações anteriores terminarem (sem botão de parar) antes de digitar.
+        for (let i = 0; i < 40; i += 1) {
+          const stopBtn = page.locator('[data-testid="stop-button"], button[aria-label*="Parar"], button[aria-label*="Stop"]').first();
+          if (!(await stopBtn.isVisible({ timeout: 500 }).catch(() => false))) break;
+          await sleep(1500);
+        }
         const composer = page.locator('div[role="textbox"][contenteditable="true"], #prompt-textarea').first();
-        await composer.waitFor({ state: 'visible', timeout: 30_000 });
+        await composer.waitFor({ state: 'visible', timeout: 60_000 });
         await composer.click();
         await composer.type(prompt, { delay: 15 });
         await page.keyboard.press('Enter');

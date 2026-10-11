@@ -87,11 +87,15 @@ bash scripts/smoke.sh
    Para expor localmente em HTTPS: `ngrok http 8080` ou Cloudflare Tunnel.
 4. Produção (Fly.io): siga o [runbook](docs/08-runbook-operacional.md).
 
-### Sem depender do seu computador (backend AnkiWeb)
+### Sem depender do seu computador (backend AnkiWeb) — ✅ ATIVO
 
 O microsserviço [`docker/ankiweb-service`](docker/ankiweb-service/README.md)
 roda um **Anki headless syncado à sua conta AnkiWeb** na nuvem + o servidor MCP
-na mesma máquina (o AnkiConnect nunca é exposto). Seu Mac pode ficar desligado:
+na mesma máquina (o AnkiConnect nunca é exposto). Seu Mac pode ficar desligado.
+
+**Status (2026-10-11):** ativo em `https://chatgpt-anki-real.fly.dev` com a conta
+AnkiWeb real — 77 baralhos, 7.430 cartões vencidos, sync a cada 15 min; conector
+`Anki (Minha Coleção)` autorizado no ChatGPT. Para reproduzir do zero:
 
 ```bash
 fly apps create chatgpt-anki-real
