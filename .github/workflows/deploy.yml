@@ -35,6 +35,6 @@ jobs:
       - name: Post-deploy healthcheck
         run: |
           sleep 15
-          curl -fsS "https://${FLY_APP_NAME:-chatgpt-anki-mcp}.fly.dev/health" | grep -q '"status":"ok"'
+          curl -fsS "https://${FLY_APP_NAME:-chatgpt-anki-mcp-sudo}.fly.dev/health" | grep -q '"status":"ok"'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

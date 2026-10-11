@@ -1,9 +1,14 @@
 # Fly.io deployment for the chatgpt-anki-plugin MCP server (M5).
-# 1. fly apps create chatgpt-anki-mcp
+# 1. fly apps create chatgpt-anki-mcp-sudo
 # 2. fly secrets set TOKEN_SECRET="$(openssl rand -base64 48)" OAUTH_CLIENT_ID=chatgpt
 # 3. fly deploy --dockerfile docker/Dockerfile
 # Ver docs/08-runbook-operacional.md para rotação de segredos e rollback.
-app = 'chatgpt-anki-mcp'
+#
+# Esta instância roda como DEMO pública (coleção 100% sintética; serve à revisão
+# da OpenAI e ao developer mode do ChatGPT). Para uso pessoal real, troque para o
+# backend connect apontando ANKI_CONNECT_URL ao seu AnkiConnect via túnel privado:
+#   fly secrets set ANKI_BACKEND=connect ANKI_CONNECT_URL=https://<tunel> ANKI_CONNECT_API_KEY=...
+app = 'chatgpt-anki-mcp-sudo'
 primary_region = 'gru'
 
 [build]
@@ -12,8 +17,8 @@ primary_region = 'gru'
 [env]
   PORT = '8080'
   HOST = '0.0.0.0'
-  # Ajuste PUBLIC_BASE_URL para https://<app>.fly.dev em produção.
-  PUBLIC_BASE_URL = 'http://localhost:8080'
+  PUBLIC_BASE_URL = 'https://chatgpt-anki-mcp-sudo.fly.dev'
+  ANKI_BACKEND = 'mock'
 
 [http_service]
   internal_port = 8080
