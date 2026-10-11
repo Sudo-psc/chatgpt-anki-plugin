@@ -3,6 +3,8 @@ import type { CardState, CardView, NoteView } from './types.js';
 
 export function stripHtml(html: string): string {
   return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')

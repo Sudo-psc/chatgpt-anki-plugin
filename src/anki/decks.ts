@@ -26,10 +26,11 @@ export class DecksAdapter {
     if (!deck) {
       throw new AnkiNotFoundError(`Deck "${name}" does not exist. Use list_decks to see available decks.`);
     }
+    // Usa o nome EXATO vindo da lista (evita mismatch NFC/NFD em nomes acentuados).
     const statsMap = await this.client.invoke<Record<string, AnkiDeckStatsWire>>('getDeckStats', {
-      decks: [name],
+      decks: [deck.name],
     });
-    const stats = Object.values(statsMap).find((item) => item.name === name) ?? null;
+    const stats = Object.values(statsMap).find((item) => item.name === deck.name) ?? null;
     const subdecks = decks.filter((item) => item.name.startsWith(`${name}::`)).map((item) => item.name);
     return {
       ...deck,
