@@ -1,0 +1,98 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #111827;
+  --accent-fg: #ffffff;
+  --chip-bg: #f3f4f6;
+  --danger: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111827;
+    --fg: #f9fafb;
+    --muted: #9ca3af;
+    --border: #374151;
+    --accent: #f9fafb;
+    --accent-fg: #111827;
+    --chip-bg: #1f2937;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1 { font-size: 1.15rem; margin: 0 0 12px; }
+h2 { font-size: 1rem; margin: 16px 0 8px; }
+
+ul.deck-list { list-style: none; margin: 0; padding: 0; }
+
+ul.deck-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.deck-name { font-weight: 600; }
+.deck-parent { color: var(--muted); font-size: 0.85em; }
+
+.chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--muted);
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 10px 0;
+}
+
+.question { font-weight: 600; }
+.answer { margin-top: 8px; color: var(--fg); }
+.muted { color: var(--muted); }
+
+table.cards { width: 100%; border-collapse: collapse; }
+table.cards th, table.cards td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 0.9em; }
+table.cards th { color: var(--muted); font-weight: 500; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+button {
+  font: inherit;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.ease-again { border-color: var(--danger); color: var(--danger); }
+
+.error { color: var(--danger); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .answer { animation: fade 200ms ease-in; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+}
