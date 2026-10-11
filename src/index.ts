@@ -1,77 +1,62 @@
-import { createApp } from './app.js';
-import { AnkiGateway } from './anki/index.js';
-import { MockAnkiConnect } from './anki/mock/mock-anki-connect.js';
-import { seedCollection } from './anki/mock/seed.js';
+#!/usr/bin/env node
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { createAnkiAdapter } from './anki/index.js';
 import { loadConfig } from './infra/config.js';
-import { createLogger } from './infra/logger.js';
-import { OAuthService } from './mcp/auth/oauth.js';
-import { FixedWindowLimiter } from './mcp/ratelimit.js';
+import { logger } from './infra/logger.js';
+import { createHttpApp } from './mcp/http-server.js';
+import { createMcpServerInstance } from './mcp/server.js';
+import { ALL_OAUTH_SCOPES } from './tools/context.js';
 
 async function main(): Promise<void> {
-  const config = loadConfig();
-  const logger = createLogger(config.logLevel);
+  const args = process.argv.slice(2);
+  const useStdio = args.includes('--stdio');
+  const config = loadConfig(process.env);
+  const { adapter, bridgeAdapter } = createAnkiAdapter(config);
 
-  let stopMock: (() => Promise<void>) | undefined;
-  let ankiUrl = config.anki.url;
-
-  if (config.anki.backend === 'mock') {
-    const mock = MockAnkiConnect.withSeed(seedCollection());
-    const listener = await mock.listen(0);
-    ankiUrl = listener.url;
-    stopMock = listener.close;
-    logger.info('mock_anki_backend_started', {
-      url: listener.url,
-      note: 'coleção sintética de demonstração — não use para dados reais',
+  if (useStdio) {
+    const server = createMcpServerInstance({
+      anki: adapter,
+      config,
+      grantedScopes: new Set(ALL_OAUTH_SCOPES),
     });
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    logger.info({ backend: adapter.backendName }, 'MCP server running on stdio');
+    return;
   }
 
-  const gateway = new AnkiGateway({
-    url: ankiUrl,
-    apiKey: config.anki.apiKey,
-    timeoutMs: config.anki.timeoutMs,
+  const { createHttpServer } = createHttpApp({
+    config,
+    anki: adapter,
+    bridgeAdapter,
   });
 
-  const oauth = new OAuthService({
-    allowedRedirectUris: config.auth.allowedRedirectUris,
-    defaultScopes: config.auth.defaultScopes,
-    allowDcr: config.auth.allowDcr,
-    envClient: {
-      clientId: config.auth.clientId,
-      ...(config.auth.clientSecret ? { clientSecret: config.auth.clientSecret } : {}),
-      redirectUris: config.auth.allowedRedirectUris,
-    },
+  const httpServer = createHttpServer();
+  httpServer.listen(config.port, config.host, () => {
+    logger.info(
+      {
+        host: config.host,
+        port: config.port,
+        publicBaseUrl: config.publicBaseUrl,
+        backend: adapter.backendName,
+        readOnly: config.ankiReadOnly,
+      },
+      'MCP HTTP server listening',
+    );
   });
 
-  const limiter = new FixedWindowLimiter(config.limits.ratePerMinute);
-
-  const app = await createApp({ config, logger, gateway, oauth, limiter });
-  await new Promise<void>((resolve) => {
-    app.server.listen(config.port, config.host, resolve);
-  });
-
-  logger.info('server_listening', {
-    port: config.port,
-    host: config.host,
-    public_base_url: config.publicBaseUrl,
-    anki_backend: config.anki.backend,
-    auth_required: config.auth.required,
-    node_env: config.nodeEnv,
-  });
-
-  const shutdown = (signal: string): void => {
-    void (async () => {
-      logger.info('shutdown_started', { signal });
-      await app.close();
-      if (stopMock) await stopMock();
+  const shutdown = (): void => {
+    logger.info('Shutting down MCP HTTP server…');
+    httpServer.close(() => {
       process.exit(0);
-    })();
+    });
   };
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${JSON.stringify({ level: 'error', msg: 'fatal_startup_error', error: message })}\n`);
+main().catch((err) => {
+  logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Fatal startup error');
   process.exit(1);
 });

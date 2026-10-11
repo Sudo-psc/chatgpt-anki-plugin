@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Anki Flashcards Bridge Icon">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+    <linearGradient id="star" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect x="96" y="124" width="260" height="300" rx="28" fill="#1e293b" stroke="#475569" stroke-width="10" transform="rotate(-7 226 274)" />
+  <rect x="148" y="96" width="268" height="308" rx="28" fill="#0f172a" stroke="#38bdf8" stroke-width="12" transform="rotate(4 282 250)" />
+  <path d="M282 146 L305 205 L368 210 L320 251 L335 313 L282 279 L229 313 L244 251 L196 210 L259 205 Z" fill="url(#star)" />
+</svg>

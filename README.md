@@ -1,165 +1,133 @@
-# ChatGPT ↔ Anki (chatgpt-anki-plugin)
+# ChatGPT ↔ Anki Plugin (`chatgpt-anki-plugin`)
 
 [![CI](https://github.com/Sudo-psc/chatgpt-anki-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/Sudo-psc/chatgpt-anki-plugin/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](./package.json)
-[![MCP](https://img.shields.io/badge/MCP-2025--06--18-blue)](https://modelcontextprotocol.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node.js >= 22.12](https://img.shields.io/badge/node-%3E%3D22.12.0-brightgreen.svg)](./package.json)
 
-Servidor **MCP** (Model Context Protocol) remoto que conecta o **ChatGPT** à sua
-coleção **Anki**, via **AnkiConnect**. Fale em linguagem natural para
-**visualizar, criar, editar, pesquisar e revisar** seus flashcards — com os
-dados ficando no **seu** Anki.
+Servidor **Model Context Protocol (MCP)** remoto (HTTPS) e local (`stdio`), com widgets interativos para o **OpenAI Apps SDK** (`text/html+skybridge`), que conecta o **ChatGPT** à sua coleção de flashcards **Anki** em tempo real.
 
-> ⚠️ **Não afiliado** à Ankitects Pty Ltd (Anki/AnkiWeb) nem à OpenAI
-> (ChatGPT). Projeto independente, licença MIT.
+---
 
-## O que dá para fazer
+## Principais Funcionalidades
 
-- 📚 Listar baralhos e sub-baralhos, com estatísticas de cada deck;
-- 🔍 Pesquisar cartões/notas com a sintaxe nativa do Anki (`deck:`, `tag:`, `is:due`, …);
-- ✏️ Criar/editar/excluir baralhos, notas e cartões (com confirmação para exclusões);
-- 🏷️ Gerenciar tags e templates de modelos de nota;
-- 🧠 Revisar com Again/Hard/Good/Easy e acompanhar estatísticas de progresso;
-- 🖥️ Widgets dentro do ChatGPT (lista de cartões e sessão de revisão).
+* **13 Tools MCP completas** com validação Zod, JSON Schema e mensagens de erro acionáveis:
+  * **Baralhos (Decks)**: `list_decks`, `get_deck`, `create_deck`, `update_deck`, `delete_deck`
+  * **Busca e Cartões**: `search_cards` (suporta toda a sintaxe nativa do Anki: `deck:`, `tag:`, `is:due`, `is:new`, `prop:ivl>=`), `get_card`
+  * **Notas (Notes)**: `create_note` (`Basic`, `Cloze` e modelos customizados), `update_note`, `delete_note`
+  * **Revisão e Estatísticas (SM-2 & FSRS)**: `get_due_cards`, `submit_review` (`Again=1`, `Hard=2`, `Good=3`, `Easy=4`), `get_stats`
+* **Widgets do OpenAI Apps SDK (`text/html+skybridge`)**:
+  * `ui://widget/deck-browser.html` — Navegador de baralhos, contagens de fila e cartões pesquisados.
+  * `ui://widget/review-session.html` — Sessão de estudo interativa com botão *Mostrar resposta* e botões *Again / Hard / Good / Easy* integrados a `window.openai.callTool('submit_review', ...)`.
+* **Segurança OAuth 2.1 + PKCE (`S256`)**:
+  * Descoberta RFC 9728 (`/.well-known/oauth-protected-resource`) e RFC 8414 (`/.well-known/oauth-authorization-server`).
+  * Dynamic Client Registration RFC 7591 (`POST /oauth/register`).
+  * Escopos por operação (`anki:read`, `anki:write`, `anki:review`, `anki:delete`).
+* **Privacidade Stateless (Zero Retenção de Cartões)**:
+  * Nenhum cartão é salvo em banco de dados no servidor; logs estruturados em `stderr` redigem automaticamente campos de cartões e tokens.
+* **3 Modos de Conexão ao Anki (`ANKI_BACKEND`)**:
+  1. `ankiconnect` — conexão HTTP direta com o add-on **AnkiConnect** (`2055492159`, porta `8765`).
+  2. `bridge` — túnel reverso WebSocket (`npx chatgpt-anki-plugin bridge`) que conecta sua coleção Anki local ao servidor MCP em nuvem (Render/Docker) **sem abrir portas no roteador e sem violar os Termos de Uso do AnkiWeb**.
+  3. `memory` — coleção sintética determinística em memória para testes, CI e avaliação imediata no ChatGPT.
 
-**15 tools MCP:** `list_decks`, `get_deck`, `create_deck`, `update_deck`,
-`delete_deck`, `search_cards`, `get_card`, `create_note`, `update_note`,
-`delete_note`, `get_due_cards`, `submit_review`, `get_stats` +
-`manage_tags`, `update_model_templates`.
-Contratos completos: [`docs/05-tools-mcp.md`](docs/05-tools-mcp.md).
+---
 
-## Demo pública (dados sintéticos)
+## Guia de Instalação Rápida (< 10 minutos)
 
-Instância de demonstração com OAuth ativo e coleção **100% sintética** — use no
-ChatGPT (developer mode) ou nos testes:
+### 1. Pré-requisitos
 
-**`https://chatgpt-anki-mcp-sudo.fly.dev/mcp`** · `curl https://chatgpt-anki-mcp-sudo.fly.dev/health`
+* **Node.js** `>= 22.12.0` e `npm`
+* *(Para uso com sua coleção real)* **Anki Desktop** aberto com o add-on [**AnkiConnect** (código `2055492159`)](https://ankiweb.net/shared/info/2055492159) instalado.
+  * **Dica macOS**: desative o App Nap para o Anki não pausar em segundo plano:
+    ```bash
+    defaults write net.ichi2.anki NSAppSleepDisabled -bool YES
+    ```
 
-## Quickstart (demo em ~2 minutos)
-
-Pré-requisito: Docker com Compose. Modo demo usa uma **coleção 100% sintética**
-(sem tocar em nenhum dado real):
+### 2. Clonar, Instalar e Subir Localmente
 
 ```bash
 git clone https://github.com/Sudo-psc/chatgpt-anki-plugin.git
 cd chatgpt-anki-plugin
-docker compose -f docker/docker-compose.yml --profile demo up -d --build anki-mcp-demo
-curl -fsS http://localhost:8080/health   # {"status":"ok",...}
-```
-
-Teste uma chamada MCP (o modo demo expõe um dev token **somente local**):
-
-```bash
-curl -s -X POST http://localhost:8080/mcp \
-  -H 'content-type: application/json' \
-  -H 'accept: application/json, text/event-stream' \
-  -H 'authorization: Bearer demo-token-change-me' \
-  -H 'mcp-protocol-version: 2025-06-18' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_decks","arguments":{}}}'
-```
-
-### Desenvolvimento local (sem Docker)
-
-```bash
 npm install
-npm run demo     # servidor com backend mock em http://localhost:8080
-npm test         # 122 testes (unit + integração + contrato)
-npm run test:coverage
-npm run e2e      # Playwright (npx playwright install chromium uma vez)
-bash scripts/smoke.sh
+cp .env.example .env
+npm run build
+npm start
 ```
 
-## Conectar ao seu Anki real
+Teste o healthcheck em outro terminal:
 
-1. **Anki Desktop** aberto com o add-on **AnkiConnect** instalado
-   (código `2055492159`; preferencialmente **com `apiKey`** configurado).
-2. Rode o servidor apontando para o AnkiConnect:
+```bash
+curl http://127.0.0.1:3000/health
+```
 
+### 3. Executar com Docker Compose
+
+```bash
+docker compose -f docker/docker-compose.yml up --build -d
+curl http://127.0.0.1:3000/health
+```
+
+### 4. Deploy Público HTTPS (Render Blueprint) e Conexão com Anki Local
+
+1. No painel do [Render](https://dashboard.render.com/), clique em **New → Blueprint** e selecione o repositório `Sudo-psc/chatgpt-anki-plugin` (o arquivo [`render.yaml`](./render.yaml) configura tudo automaticamente).
+2. Para conectar seu Anki Desktop local ao servidor HTTPS em nuvem sem abrir portas no seu roteador, execute na sua máquina:
    ```bash
-   cp .env.example .env          # ajuste TOKEN_SECRET e ANKI_CONNECT_URL
-   docker compose -f docker/docker-compose.yml up -d --build
+   npx chatgpt-anki-plugin bridge --server wss://<SEU-APP>.onrender.com/bridge --token <BRIDGE_SHARED_TOKEN>
    ```
+3. No **ChatGPT (Plus / Pro / Team / Enterprise)**:
+   * Ative **Settings → Apps & Connectors → Advanced → Developer Mode**.
+   * Adicione o conector com a URL `https://<SEU-APP>.onrender.com/mcp` e autentique via OAuth 2.1 usando o seu `OAUTH_AUTHORIZE_PIN`.
 
-   ou sem Docker: `ANKI_BACKEND=connect ANKI_CONNECT_URL=http://127.0.0.1:8765 npm run dev`.
+---
 
-3. **ChatGPT** → Settings → Connectors → Advanced → *Developer mode* ON →
-   **Create** → URL `https://<seu-host>/mcp` → autorize via OAuth.
-   Para expor localmente em HTTPS: `ngrok http 8080` ou Cloudflare Tunnel.
-4. Produção (Fly.io): siga o [runbook](docs/08-runbook-operacional.md).
+## Estrutura do Repositório
 
-## Arquitetura (resumo)
-
-```
-ChatGPT ──(HTTPS · MCP Streamable HTTP · OAuth 2.1+PKCE)──▶ chatgpt-anki-plugin
-                                                              │
-                                             (HTTP local · AnkiConnect API v6)
-                                                              ▼
-                                                    Anki Desktop do usuário
-```
-
-- **Stateless**: nenhum conteúdo de cartão é armazenado (ver
-  [ADR-0004](docs/04-adr/ADR-0004-stateless-sem-persistencia.md));
-- **OAuth 2.1 + PKCE S256** com **scopes por operação**
-  (`anki:read` · `anki:write` · `anki:review` · `anki:admin`);
-- **Erros tipados e acionáveis** (`{code, message, hint}`);
-- Detalhes: [`docs/03-arquitetura.md`](docs/03-arquitetura.md) e
-  [8 ADRs](docs/04-adr/).
-
-## Limitações conhecidas (honestas)
-
-- **AnkiWeb não tem API pública.** O projeto usa **AnkiConnect** (recomendação
-  do próprio manual do Anki) e **nunca** acessa o AnkiWeb ou armazena suas
-  credenciais — ver [ADR-0001](docs/04-adr/ADR-0001-estrategia-acesso-anki.md).
-- **Anki Desktop precisa estar aberto** com o add-on AnkiConnect (o servidor
-  reporta `ANKI_UNAVAILABLE` com instruções quando não está).
-- **v0.1 é single-tenant** (uma instância por usuário/self-host); multi-tenant
-  é o roadmap para listagem pública plena — ver
-  [ADR-0008](docs/04-adr/ADR-0008-single-tenant-primeiro.md).
-- `update_deck` (renomear) é composto e **não suporta decks com subdecks**
-  (AnkiConnect não tem rename nativo).
-- `update_note.tags` **substitui** a lista de tags (use `manage_tags` para merge).
-- `submit_review` requer AnkiConnect recente (ação `answerCards`); versões
-  antigas retornam erro com instrução de atualização.
-
-## Configuração
-
-Todas as variáveis documentadas em [`.env.example`](./.env.example).
-Destaques: `TOKEN_SECRET` (obrigatório em produção), `ANKI_CONNECT_URL`,
-`ANKI_CONNECT_API_KEY`, `PUBLIC_BASE_URL`, `DEFAULT_SCOPE`, `AUTH_REQUIRED`,
-`MCP_DEV_TOKEN` (só em dev), `RATE_LIMIT_PER_MINUTE`, `MAX_BODY_BYTES`.
-
-## Segurança e privacidade
-
-- [`SECURITY.md`](./SECURITY.md) — reporte vulnerabilidades em privado;
-- [`docs/06-seguranca-e-privacidade.md`](docs/06-seguranca-e-privacidade.md) — STRIDE, LGPD/GDPR;
-- [Política de Privacidade](docs/legal/politica-de-privacidade.md) ·
-  [Termos de Uso](docs/legal/termos-de-uso.md).
-
-## Estrutura do repositório
-
-```
-src/mcp/       protocolo MCP, OAuth, rate limit, servidor
-src/tools/     as 15 tools (contratos Zod + handlers + erros)
-src/anki/      adapters AnkiConnect + MockAnkiConnect (demo/testes)
-src/domain/    entidades e mappers (anti-corruption layer)
-src/widgets/   UI do Apps SDK (decks, review)
-docs/          00–10 + ADRs + legais + evidências
-tests/         unit · integration · contract · e2e
-docker/  .github/workflows/  scripts/
+```text
+chatgpt-anki-plugin/
+├─ .github/workflows/          # CI (lint, typecheck, coverage >=80%, E2E, Gitleaks, SBOM) e Release
+├─ docs/
+│  ├─ 00-visao-geral.md
+│  ├─ 01-requisitos-funcionais.md
+│  ├─ 02-requisitos-nao-funcionais.md
+│  ├─ 03-arquitetura.md
+│  ├─ 04-adr/                  # ADR-0001 a ADR-0006
+│  ├─ 05-tools-mcp.md          # Contrato detalhado das 13 tools MCP
+│  ├─ 06-seguranca-e-privacidade.md
+│  ├─ 07-plano-de-testes.md
+│  ├─ 08-runbook-operacional.md
+│  ├─ 09-submissao-openai.md
+│  └─ 10-backlog-e-cronograma.md
+├─ src/
+│  ├─ anki/                    # AnkiAdapter, AnkiConnectAdapter, BridgeRelayAdapter, InMemoryAnkiAdapter, search, review
+│  ├─ bridge/                  # CLI `anki-bridge` (túnel WebSocket reverso)
+│  ├─ domain/                  # Entidades (Deck, Note, Card, Review) e erros tipados
+│  ├─ infra/                   # Config, Logger (stderr c/ redação PII), Telemetria
+│  ├─ mcp/                     # McpServer, Streamable HTTP Express e OAuth 2.1 + PKCE
+│  ├─ tools/                   # As 13 tools MCP (uma por arquivo)
+│  └─ widgets/                 # Widgets HTML/JS do OpenAI Apps SDK (text/html+skybridge)
+├─ tests/{unit,integration,e2e,contract}/
+├─ scripts/                    # copy-assets, smoke, seed
+├─ docker/                     # Dockerfile multi-stage + docker-compose.yml
+├─ render.yaml                 # Blueprint IaC para deploy HTTPS no Render
+├─ CHANGELOG.md  CONTRIBUTING.md  LICENSE  README.md  SECURITY.md
 ```
 
-## Documentação completa
+---
 
-Índice em [`docs/README.md`](docs/README.md) — visão, requisitos (14 FR + 12
-NFR), arquitetura, ADRs, contratos das tools, segurança, testes, runbook,
-submissão OpenAI e backlog (50 tarefas).
+## Comandos de Desenvolvimento e Qualidade
 
-## Contribuindo
+```bash
+npm run dev            # Servidor em modo watch (tsx)
+npm run lint           # ESLint
+npm run typecheck      # TypeScript strict (--noEmit)
+npm test               # Vitest (unit + integration + contract)
+npm run test:coverage  # Vitest com gate de cobertura >= 80% em src/tools e src/anki
+npm run test:e2e       # Playwright E2E dos widgets do Apps SDK
+npm run build          # Compila TypeScript para dist/
+npm run smoke          # Smoke test contra servidor em execução
+```
 
-Leia [`CONTRIBUTING.md`](./CONTRIBUTING.md): Conventional Commits, branches
-protegidas, CI obrigatória, cobertura ≥80% em `src/tools` e `src/anki`, e a
-regra de ouro: **nunca** dados reais em fixtures — use a coleção sintética.
+---
 
 ## Licença
 
-[MIT](./LICENSE) © 2026 Philipe Saraiva Cruz.
+Distribuído sob a licença **MIT**. Veja [`LICENSE`](./LICENSE) para mais informações.

@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: chatgpt-anki-plugin
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "3000"
+      - key: ANKI_BACKEND
+        value: memory
+      - key: ANKI_READ_ONLY
+        value: "0"
+      - key: OAUTH_JWT_SECRET
+        generateValue: true
+      - key: OAUTH_AUTHORIZE_PIN
+        generateValue: true
+      - key: BRIDGE_SHARED_TOKEN
+        generateValue: true

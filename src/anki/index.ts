@@ -1,46 +1,55 @@
-import { AnkiConnectClient, type AnkiConnectClientOptions } from './client.js';
-import { CardsAdapter } from './cards.js';
-import { DecksAdapter } from './decks.js';
-import { NotesAdapter } from './notes.js';
-import { ReviewAdapter } from './review.js';
+import type { AppConfig } from '../infra/config.js';
+import type { AnkiAdapter } from './adapter.js';
+import { AnkiConnectAdapter } from './anki-connect-adapter.js';
+import { BridgeRelayAdapter } from './bridge-adapter.js';
+import { InMemoryAnkiAdapter } from './memory-adapter.js';
 
-export { AnkiConnectClient } from './client.js';
-export { CardsAdapter } from './cards.js';
-export { DecksAdapter } from './decks.js';
-export { NotesAdapter } from './notes.js';
-export { ReviewAdapter } from './review.js';
-export {
-  AnkiError,
-  AnkiConnectError,
-  AnkiTransportError,
-  AnkiNotFoundError,
-  AnkiConflictError,
-} from './errors.js';
+export * from './adapter.js';
+export * from './anki-connect-adapter.js';
+export * from './bridge-adapter.js';
+export * from './memory-adapter.js';
+export * from './review.js';
+export * from './search.js';
 
-export type { AnkiConnectClientOptions };
-
-/**
- * Single entry point the MCP tool layer talks to. Swapping the backing
- * strategy (AnkiConnect, headless Anki, ...) only requires another
- * implementation of this facade — see ADR-0001.
- */
-export class AnkiGateway {
-  readonly client: AnkiConnectClient;
-  readonly decks: DecksAdapter;
-  readonly cards: CardsAdapter;
-  readonly notes: NotesAdapter;
-  readonly review: ReviewAdapter;
-
-  constructor(options: AnkiConnectClientOptions) {
-    this.client = new AnkiConnectClient(options);
-    this.decks = new DecksAdapter(this.client);
-    this.cards = new CardsAdapter(this.client);
-    this.notes = new NotesAdapter(this.client);
-    this.review = new ReviewAdapter(this.client);
+export function createAnkiAdapter(config: AppConfig): {
+  adapter: AnkiAdapter;
+  bridgeAdapter?: BridgeRelayAdapter;
+} {
+  if (config.ankiBackend === 'memory') {
+    return { adapter: new InMemoryAnkiAdapter(true) };
+  }
+  if (config.ankiBackend === 'bridge') {
+    const bridgeAdapter = new BridgeRelayAdapter({
+      sharedToken: config.bridgeSharedToken,
+      timeoutMs: config.ankiConnectTimeoutMs,
+    });
+    return { adapter: bridgeAdapter, bridgeAdapter };
   }
 
-  async ready(): Promise<{ ok: true; version: number }> {
-    const version = await this.client.ping();
-    return { ok: true, version };
-  }
+  const bridgeAdapter = new BridgeRelayAdapter({
+    sharedToken: config.bridgeSharedToken,
+    timeoutMs: config.ankiConnectTimeoutMs,
+  });
+
+  const directAdapter = new AnkiConnectAdapter({
+    url: config.ankiConnectUrl,
+    apiKey: config.ankiConnectApiKey,
+    timeoutMs: config.ankiConnectTimeoutMs,
+  });
+
+  // If a bridge client is actively connected to this server, route through it automatically;
+  // otherwise use direct local AnkiConnect HTTP.
+  const hybridAdapter = new AnkiConnectAdapter({
+    url: config.ankiConnectUrl,
+    apiKey: config.ankiConnectApiKey,
+    timeoutMs: config.ankiConnectTimeoutMs,
+    customTransport: async (action, params) => {
+      if (bridgeAdapter.isBridgeConnected()) {
+        return bridgeAdapter.invokeRaw(action, params);
+      }
+      return directAdapter.invokeRaw(action, params);
+    },
+  });
+
+  return { adapter: hybridAdapter, bridgeAdapter };
 }

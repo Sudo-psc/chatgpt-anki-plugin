@@ -1,8 +1,9 @@
-name: Release
+name: Release & Docker Publish
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags:
+      - 'v*.*.*'
 
 permissions:
   contents: write
@@ -10,46 +11,39 @@ permissions:
 
 jobs:
   release:
-    name: GitHub release + Docker image (ghcr.io)
+    name: Build, Verify & Publish Container Image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint && npm run typecheck && npm run test:coverage && npm run build
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Log in to GHCR
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install, Test & Build
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run test:coverage
+          npm run build
+
+      - name: Log in to GitHub Container Registry (GHCR)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/Dockerfile
+          file: ./docker/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest

@@ -1,65 +1,99 @@
-# 02 — Requisitos Não Funcionais
+# Requisitos Não Funcionais (`RNF-001` a `RNF-012`)
 
-Cada NFR tem método de verificação explícito. "CI" = executado no workflow
-`.github/workflows/ci.yml`.
+Todos os requisitos não funcionais possuem metas quantitativas e critérios de aceite verificáveis.
 
-## NFR-01 — Latência de leitura
+---
 
-- **Meta:** tools de leitura (list/get/search/due/stats) com p95 < 2,5 s quando o AnkiConnect local responde normalmente (exclui tempo do modelo ChatGPT).
-- **Verificação:** medição local no smoke/E2E (`http_request.ms` nos logs estruturados); plano de carga em `07-plano-de-testes.md` § carga. Timeout do cliente AnkiConnect: 10 s configurável (`ANKI_TIMEOUT_MS`).
-- **Estado:** limite de 10 s garantido por config; p95 medido no smoke (típico < 50 ms local). Teste de carga formal: T-027.
+## RNF-001 — Latência de Resposta das Tools MCP
 
-## NFR-02 — Portabilidade / setup em minutos
+* **Categoria**: Desempenho.
+* **Especificação**: O overhead introduzido pelo servidor MCP (validação Zod, verificação JWT, serialização JSON-RPC) deve ser `< 50 ms` no percentil 95 (p95); chamadas completas contra o AnkiConnect local ou `InMemoryAnkiAdapter` devem responder em `< 500 ms` (p95) para consultas de até 50 cartões.
+* **Critério de Aceite**: Suíte de integração executa as 13 tools em `< 500 ms` por chamada; timeout configurável via `ANKICONNECT_TIMEOUT_MS` (padrão `8000 ms`) aborta chamadas penduradas com erro `ANKI_TIMEOUT`.
 
-- **Meta:** um terceiro sobe o servidor por Docker em < 15 minutos seguindo o README.
-- **Verificação:** README § Quickstart (2 comandos no modo demo); teste de usabilidade documentado em `docs/evidencias/C13-setup-15min.md`. Servidor Docker multi-stage sem dependências de sistema além do Node alpine.
+---
 
-## NFR-03 — Segurança de autenticação e autorização
+## RNF-002 — Privacidade e Processamento Stateless (Zero Retenção de Cartões)
 
-- **Meta:** OAuth 2.1 authorization code + PKCE (S256 obrigatório), DCR opcional, scopes por operação, tokens HMAC-SHA256 com `aud`/`iss`/`exp` validados; token inválido/expirado → **401**; scope insuficiente → erro `FORBIDDEN`; validação de `Origin` (DNS rebinding) → 403.
-- **Verificação:** `tests/integration/auth.test.ts` (15 testes) + `tests/unit/oauth.test.ts` + `tests/unit/tokens.test.ts`. CI.
+* **Categoria**: Privacidade / LGPD / GDPR.
+* **Especificação**: O servidor MCP **não persiste conteúdo de cartões, notas ou baralhos em banco de dados próprio** em modo `ankiconnect` ou `bridge`. Todo o tráfego de cartões é processado em memória de forma *stateless* e *pass-through*.
+* **Critério de Aceite**: Nenhum arquivo SQLite/JSON de conteúdo de usuário é gravado em disco pelo servidor HTTP; logs estruturados (`src/infra/logger.ts`) registram apenas `tool`, `action`, `durationMs`, `status` e `requestId`, nunca `fields`, `Front`, `Back` ou `tags`.
 
-## NFR-04 — Privacidade (stateless)
+---
 
-- **Meta:** nenhum conteúdo de cartão/nota é persistido ou logado. Sem banco de dados; sem cache de payload. Logs estruturados sem conteúdo (apenas metadados) e com redação de chaves sensíveis e truncamento de strings (500 chars).
-- **Verificação:** `tests/unit/logger.test.ts` (redação/truncamento); ausência de persistência por design (ADR-0004, revisão de código); política em `06-seguranca-e-privacidade.md`.
+## RNF-003 — Segurança de Autenticação e Criptografia em Trânsito
 
-## NFR-05 — Confiabilidade e erros acionáveis
+* **Categoria**: Segurança.
+* **Especificação**: Em produção, todo tráfego externo ocorre exclusivamente sobre HTTPS (TLS 1.2+) e WSS, com tokens JWT assinados com HMAC-SHA256 (`HS256`, segredo ≥ 256 bits) ou par de chaves assimétricas, PKCE `S256` obrigatório e comparação em tempo constante (`crypto.timingSafeEqual`) para segredos estáticos.
+* **Critério de Aceite**: Tentativa de iniciar o servidor HTTP em host público (`0.0.0.0`) com `MCP_ALLOW_UNAUTHENTICATED=1` ou sem `OAUTH_JWT_SECRET` seguro falha na inicialização (`assertHttpSecurity`).
 
-- **Meta:** toda falha retorna payload tipado `{code, message, hint}` com `code` no conjunto documentado; timeout configurável; `/health` independente do Anki e `/ready` refletindo o AnkiConnect; operações destrutivas exigem `confirm=true`.
-- **Verificação:** `tests/contract` (taxonomia de erro), `tests/integration/health.test.ts` (`/ready` 200/503), cenário `ANKI_UNAVAILABLE` em integração. CI.
+---
 
-## NFR-06 — Observabilidade
+## RNF-004 — Cobertura de Testes Automatizados ≥ 80%
 
-- **Meta:** logs JSON estruturados por request (`method/path/status/ms`) e por tool call (`tool/subject/ms/ok/code`); interface `withSpan` pronta para OTel; sem dependência obrigatória de backend externo.
-- **Verificação:** `src/infra/telemetry.ts` + logs nos testes; plano de exportador OTel no runbook (`08`).
+* **Categoria**: Qualidade / Manutenibilidade.
+* **Especificação**: A cobertura de linhas, funções, branches e statements nos módulos `src/tools/**` e `src/anki/**` deve ser **≥ 80%**.
+* **Critério de Aceite**: `npm run test:coverage` falha com código de saída `!= 0` se qualquer métrica em `src/tools` ou `src/anki` ficar abaixo de 80% (configurado em `vitest.config.ts`).
 
-## NFR-07 — Limites e abuso
+---
 
-- **Meta:** body máximo por requisição (default 1 MiB) com 413; rate limit por subject OAuth (default 120/min) com erro `RATE_LIMITED` + `retry`;
-- **Verificação:** `tests/integration/health.test.ts` (413) e `mcp-tools.test.ts` (`RATE_LIMITED`); `tests/unit/ratelimit.test.ts`.
+## RNF-005 — Conformidade Estrita de Contratos e Erros Acionáveis
 
-## NFR-08 — Compatibilidade de protocolo
+* **Categoria**: Confiabilidade / UX Conversacional.
+* **Especificação**: Toda tool MCP deve validar entradas com Zod, expor JSON Schema completo com `.describe()` em todos os parâmetros, retornar `structuredContent` tipado e, em caso de falha, retornar erro estruturado (`code`, `message`, `hint`, `retryable`) sem expor stack traces internos.
+* **Critério de Aceite**: Suíte `tests/contract/tools.contract.test.ts` valida os schemas, anotações (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) e envelopes de sucesso/erro das 13 tools.
 
-- **Meta:** MCP 2025-06-18 Streamable HTTP em modo JSON (`enableJsonResponse`) e stateless; `Accept` exigindo `application/json` + `text/event-stream`; `Mcp-Protocol-Version` validada; GET `/mcp` → 405 (sem SSE); compatível com o connector do ChatGPT.
-- **Verificação:** smoke + integração usam o handshake real (initialize/notifications/initialized); comportamento verificado no código do transporte (SDK oficial).
+---
 
-## NFR-09 — Qualidade de código e testes
+## RNF-006 — Limite de Payload e Paginação para o ChatGPT
 
-- **Meta:** cobertura ≥ 80% em `src/tools` e `src/anki` (atual: 96,9%/94,0% linhas; 92,3% branches agregado), testes de contrato para as 15 tools, CI verde com lint+typecheck+build.
-- **Verificação:** gate `coverage.thresholds` no `vitest.config.ts` (linhas/statements/funções 80, branches 75); badge do Actions.
+* **Categoria**: Escalabilidade / Limites da Plataforma OpenAI.
+* **Especificação**: Nenhuma tool pode retornar mais de 100 cartões por chamada ou payloads superiores a `256 KB`, evitando truncamento de contexto no modelo.
+* **Critério de Aceite**: `search_cards` e `get_due_cards` impõem `limit <= 100` no schema Zod e truncam campos de pré-visualização longos em listagens (mantendo o conteúdo integral em `get_card`).
 
-## NFR-10 — Conformidade legal (LGPD/GDPR)
+---
 
-- **Meta:** sem dados pessoais persistidos; processamento *pass-through*; política de privacidade pública detalhando dados tratados (metadados de autenticação), finalidade e controles; nenhum dado de paciente/usuário em fixtures (coleção sintética).
-- **Verificação:** `docs/legal/politica-de-privacidade.md`; revisão de fixtures (`src/anki/mock/seed.ts` sintético); declaração de não afiliação.
+## RNF-007 — Rate Limiting e Proteção contra Abuso
 
-## NFR-11 — Acessibilidade dos widgets
+* **Categoria**: Segurança / Disponibilidade.
+* **Especificação**: Os endpoints `/oauth/*` e `/mcp` devem contar com *rate limiting* por IP (`express-rate-limit`) e cabeçalhos de segurança HTTP (`helmet`, CSP restritiva para widgets).
+* **Critério de Aceite**: Exceder o limite configurado retorna `429 Too Many Requests` com cabeçalho `Retry-After`.
 
-- **Meta:** widgets com HTML semântico (headings, tabela com th, botões reais), contraste adequado (tema claro/escuro), navegação por teclado (Espaço mostra resposta; 1–4 respondem), `prefers-reduced-motion` respeitado.
-- **Verificação:** `tests/e2e/widget.spec.ts` (teclado) + CSP restritiva; checklist manual básico WCAG AA.
+---
 
-## NFR-12 — Documentação e operabilidade
+## RNF-008 — Observabilidade (Logs Estruturados, Métricas e Healthcheck)
 
-- **Meta:** documentação completa (visão, requisitos, arquitetura, 8 ADRs, contratos, segurança, testes, runbook, submissão); runbook cobre rotação de segredos, rollback, vazamento de token e indisponibilidade do Anki; CHANGELOG e guia de contribuição.
-- **Verificação:** estrutura `docs/` (esta pasta) e revisão cruzada `C13/C14`.
+* **Categoria**: Operação / Observabilidade.
+* **Especificação**: O servidor deve emitir logs JSON estruturados em `stderr` (compatível com OpenTelemetry / Pino), propagar `x-request-id` e expor `GET /health` (e `/healthz`) além de métricas operacionais em `GET /metrics`.
+* **Critério de Aceite**: `GET /health` retorna `200 OK` com `{ status: "ok", version, uptimeSeconds, anki: { backend, reachable } }` em `< 100 ms`.
+
+---
+
+## RNF-009 — Portabilidade e Reprodutibilidade em Container (Docker)
+
+* **Categoria**: DevOps / Implantação.
+* **Especificação**: O projeto deve fornecer `docker/Dockerfile` multi-stage rodando com usuário não-root (`node`), `docker/docker-compose.yml` e `render.yaml` prontos para deploy contínuo.
+* **Critério de Aceite**: Um terceiro consegue subir o servidor localmente em `< 15 minutos` seguindo o `README.md` (via `npm start` ou `docker compose up`).
+
+---
+
+## RNF-010 — Ausência Total de Segredos e Dados Pessoais no Repositório
+
+* **Categoria**: Segurança de Supply Chain.
+* **Especificação**: Zero credenciais reais, tokens, chaves privadas ou coleções `.anki2`/`.apkg` reais no código-fonte ou no histórico do Git.
+* **Critério de Aceite**: Workflow de CI executa verificação de segredos (Gitleaks) e geração de SBOM CycloneDX a cada push/PR em `main`.
+
+---
+
+## RNF-011 — Modo Somente-Leitura de Emergência (`ANKI_READ_ONLY`)
+
+* **Categoria**: Segurança Operacional.
+* **Especificação**: Quando `ANKI_READ_ONLY=1` estiver ativo, todas as 8 tools de escrita/exclusão/revisão (`create_deck`, `update_deck`, `delete_deck`, `create_note`, `update_note`, `delete_note`, `submit_review`) devem recusar alterações antes de tocar no adaptador Anki.
+* **Critério de Aceite**: Testes automatizados verificam que 100% das tools mutáveis retornam `READ_ONLY_MODE` quando `ANKI_READ_ONLY=1`.
+
+---
+
+## RNF-012 — Resiliência à Indisponibilidade do Anki Desktop
+
+* **Categoria**: Resiliência.
+* **Especificação**: Quando o Anki Desktop estiver fechado, em App Nap (macOS) ou com a ponte WebSocket desconectada, o servidor MCP não deve cair; deve retornar `ANKI_UNREACHABLE` com instruções passo a passo para o usuário abrir o Anki ou iniciar `npx chatgpt-anki-plugin bridge`.
+* **Critério de Aceite**: Teste unitário e de integração simula `ECONNREFUSED` na porta `8765` e valida o retorno de erro estruturado acionável sem queda do processo HTTP.

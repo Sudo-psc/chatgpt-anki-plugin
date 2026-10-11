@@ -1,45 +1,23 @@
-# Política de Segurança
+# Política de Segurança (`SECURITY.md`)
 
-## Versões suportadas
+## Versões Suportadas
 
-| Versão | Suporte |
-|:---|:---|
-| 0.1.x | ✅ |
-| < 0.1 | ❌ |
+| Versão | Suportada |
+|:-------|:----------|
+| `0.1.x` | Sim |
 
-## Reportando uma vulnerabilidade
+## Invariantes de Segurança do Projeto
 
-Não abra issue pública. Envie um e-mail para **philipe.saraiva.cruz@gmail.com**
-com:
+1. **Zero Retenção de Flashcards em Nuvem**: em modo `ankiconnect` e `bridge`, o servidor processa os cartões de forma *stateless pass-through* em memória volátil e jamais grava o conteúdo dos cartões em disco.
+2. **OAuth 2.1 com PKCE (`S256`) Obrigatório em Hosts Públicos**: `assertHttpSecurity` impede que o servidor suba em interfaces não-loopback (`0.0.0.0`) com `MCP_ALLOW_UNAUTHENTICATED=1` ou com segredo JWT fraco.
+3. **Sem Credenciais do AnkiWeb**: o projeto nunca solicita nem armazena usuário ou senha do `ankiweb.net`.
+4. **Proteção contra Operações Destrutivas**: `delete_deck` e `delete_note` exigem escopo OAuth `anki:delete` e parâmetro explícito `confirm: true`. O modo `ANKI_READ_ONLY=1` bloqueia qualquer mutação na coleção.
+5. **Logs Livres de PII**: `src/infra/logger.ts` escreve exclusivamente em `stderr` com redação automática de `Authorization`, `token`, `fields`, `Front`, `Back`, `tags` e `pin`.
 
-- Descrição da vulnerabilidade e impacto potencial;
-- Passos de reprodução (PoC);
-- Versão/commit afetado;
-- Se desejar, sugestão de mitigação.
+## Como Reportar uma Vulnerabilidade
 
-Resposta esperada em até 5 dias úteis. Divulgaremos a correção e daremos
-crédito (se autorizado) após o fix ser publicado.
+Por favor, **não abra uma issue pública** para vulnerabilidades de segurança.
 
-## Modelo de ameaça (resumo)
-
-O modelo completo (STRIDE) está em [`docs/06-seguranca-e-privacidade.md`](docs/06-seguranca-e-privacidade.md).
-
-- O servidor MCP é um *resource server* OAuth 2.1; todo acesso a `/mcp` exige
-  Bearer token válido (assinatura HMAC, expiração e audience).
-- Scopes por operação limitam o dano de um token vazado (`anki:read` vs
-  `anki:write` vs `anki:review` vs `anki:admin`).
-- O servidor é **stateless com relação a conteúdo de cartões**: nenhuma nota,
-  campo ou cartão é persistido pelo servidor.
-- O adapter Anki fala apenas com **AnkiConnect local/self-hosted** do usuário.
-  O projeto não acessa o AnkiWeb, não automatiza login e não armazena
-  credenciais do AnkiWeb (ver ADR-0001).
-
-## Segredos
-
-- Segredos apenas via variáveis de ambiente/secret manager.
-- `.env` nunca é comitado; CI roda `gitleaks` no working tree e no histórico.
-- Em produção, `TOKEN_SECRET` é obrigatório e o servidor recusa o valor padrão.
-
-## Rotação de segredos e resposta a incidentes
-
-Procedimentos em [`docs/08-runbook-operacional.md`](docs/08-runbook-operacional.md).
+* Utilize a aba **Security → Report a vulnerability** (GitHub Private Vulnerability Reporting) no repositório [`https://github.com/Sudo-psc/chatgpt-anki-plugin/security/advisories/new`](https://github.com/Sudo-psc/chatgpt-anki-plugin/security/advisories/new).
+* Tempo de resposta inicial: até **48 horas**.
+* Procedimento de rotação de segredos e contenção: documentado em [`docs/08-runbook-operacional.md`](./docs/08-runbook-operacional.md).

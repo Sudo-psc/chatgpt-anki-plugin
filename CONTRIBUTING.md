@@ -1,80 +1,37 @@
-# Contribuindo
+# Guia de Contribuição (`CONTRIBUTING.md`)
 
-Obrigado por contribuir com o `chatgpt-anki-plugin`! Este documento define o
-fluxo de trabalho, as convenções de código e as regras de qualidade.
+Obrigado pelo interesse em contribuir com o **`chatgpt-anki-plugin`**!
 
-## Requisitos de ambiente
+## 1. Pré-requisitos
 
-- Node.js ≥ 20 (recomendado 22 LTS)
-- npm ≥ 10
-- Docker (opcional, para o modo demo/mock)
+* **Node.js** `>= 22.12.0` e `npm`
+* **Git**
+* **Anki Desktop** + add-on **AnkiConnect** (código `2055492159`) — opcional para desenvolvimento local graças ao `InMemoryAnkiAdapter` (`ANKI_BACKEND=memory`).
 
-## Fluxo de branches e PRs
+## 2. Fluxo de Branches e Commits
 
-| Branch | Uso |
-|:---|:---|
-| `main` | Produção. Protegida: sem push direto, CI obrigatória, 1 review. |
-| `develop` | Integração contínua antes de release. |
-| `feat/*` | Nova funcionalidade. |
-| `fix/*` | Correção de bug. |
-| `docs/*` | Documentação. |
-| `release/*` | Preparação de release. |
+* `main`: branch principal protegida (sempre pronta para produção).
+* `develop`: branch de integração.
+* `feat/<escopo>`, `fix/<escopo>`, `docs/<escopo>`, `release/<versao>`: branches de trabalho.
+* **Conventional Commits** em inglês:
+  * `feat(tools): add interval filter to search_cards`
+  * `fix(anki): handle null deck stats on empty profile`
+  * `docs(adr): document OAuth 2.1 PKCE token lifecycle`
 
-Regras de PR:
-
-1. Todo PR referencia a tarefa do backlog (`T-0XX`) e o requisito
-   (`FR-XX`/`NFR-XX`) que atende.
-2. CI verde é obrigatório (lint, typecheck, testes com cobertura, build,
-   scan de segredos).
-3. Cobertura ≥ 80% em `src/tools` e `src/anki` — o build falha abaixo disso.
-4. Revisão por pessoa/agente **diferente do autor**; sem autoaprovação.
-5. PRs que alteram escopo atualizam `docs/01-requisitos-funcionais.md` e
-   registram um ADR em `docs/04-adr/`.
-
-## Commits
-
-[Conventional Commits](https://www.conventionalcommits.org/pt-br/):
-
-```
-feat(tools): add get_due_cards tool
-fix(anki): map AnkiConnect timeout to ANKI_UNAVAILABLE
-docs(adr): add ADR-0001 Anki access strategy
-test(contract): cover update_model_templates error paths
-chore(ci): add gitleaks step
-```
-
-Tipos: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`, `build`.
-
-## Regras de código
-
-- TypeScript `strict`; sem `any` implícito; imports relativos com extensão `.js`
-  (ESM/NodeNext).
-- Erros de negócio **sempre tipados** via `ToolError`/códigos documentados em
-  `docs/05-tools-mcp.md`.
-- Toda tool MCP nova exige: schema Zod de entrada/saída, scope, contrato
-  documentado, teste de contrato e cobertura.
-- Sem comentários supérfluos; comentários apenas para decisões não óbvias.
-
-## Segurança e privacidade (inegociável)
-
-- **Nunca** comitar segredos, chaves, `.env` real ou credenciais.
-- **Nunca** usar conteúdo real de cartões/notas em fixtures, screenshots,
-  exemplos ou documentação. Use a coleção sintética de `src/anki/mock`.
-- O servidor é stateless: não adicione persistência de conteúdo de cartões sem
-  consentimento explícito, criptografia e um ADR aprovado.
-- Não implemente scraping do AnkiWeb, automação de login ou engenharia reversa
-  do protocolo de sync. Leia o ADR-0001 antes de propor mudanças de acesso ao Anki.
-
-## Rodando localmente
+## 3. Como Executar Localmente e Validar Mudanças
 
 ```bash
 npm install
-npm run demo          # servidor em modo demo (coleção sintética) em :8080
-npm test              # testes unitários + integração + contrato
-npm run test:coverage # com gate de cobertura
-npm run lint && npm run typecheck && npm run build
+npm run lint           # ESLint (zero warnings/errors)
+npm run typecheck      # TypeScript strict (tsc --noEmit)
+npm run test:coverage  # Vitest (unit + integration + contract, cobertura >= 80%)
+npm run test:e2e       # Playwright E2E dos widgets do Apps SDK
+npm run build          # Compila para dist/
 ```
 
-## Reportando problemas de segurança
+## 4. Regras Obrigatórias para Pull Requests
 
-Veja [SECURITY.md](./SECURITY.md). Não abra issue pública para vulnerabilidades.
+1. **Nunca comite segredos, `.env` ou coleções reais (`.anki2`, `.apkg`, `.colpkg`).**
+2. Toda alteração nas tools MCP exige atualização simultânea de [`docs/05-tools-mcp.md`](./docs/05-tools-mcp.md) e da suíte [`tests/contract/tools.contract.test.ts`](./tests/contract/tools.contract.test.ts).
+3. Mudanças arquiteturais ou de requisitos exigem atualização de [`docs/01-requisitos-funcionais.md`](./docs/01-requisitos-funcionais.md) e um novo ADR em [`docs/04-adr/`](./docs/04-adr/).
+4. Cobertura de testes em `src/tools` e `src/anki` deve permanecer **≥ 80%**.

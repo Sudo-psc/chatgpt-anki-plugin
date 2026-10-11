@@ -1,86 +1,93 @@
-# 00 — Visão Geral
+# Visão Geral — Plugin ChatGPT ↔ Anki (`chatgpt-anki-plugin`)
 
-> Escopo congelado em 2026-10-10 (ver `CHANGELOG.md` v0.1.0). Alterações de
-> escopo exigem atualização deste documento e um novo ADR.
+## 1. Propósito e Escopo Congelado
 
-## O que é
+O **`chatgpt-anki-plugin`** é um servidor **Model Context Protocol (MCP)** remoto e local, construído em TypeScript (Node.js ≥ 22.12), com interface visual embarcada para o **OpenAI Apps SDK** (`text/html+skybridge`), que conecta o **ChatGPT** à coleção de flashcards **Anki** do usuário por meio de linguagem natural.
 
-**chatgpt-anki-plugin** é um servidor MCP (Model Context Protocol) remoto que
-conecta o ChatGPT à coleção Anki do usuário via **AnkiConnect**, permitindo, por
-linguagem natural:
+Com este plugin/app, o usuário pode diretamente no ChatGPT:
 
-- **Visualizar** baralhos, sub-baralhos, notas e cartões;
-- **Criar/editar/excluir** baralhos, notas e cartões;
-- **Pesquisar** com a sintaxe nativa de busca do Anki;
-- **Revisar** cartões (Again/Hard/Good/Easy) e ver estatísticas de progresso;
-- **Gerenciar tags** e **templates de modelos de nota**.
+1. **Visualizar** baralhos (*decks*), sub-baralhos (`Pai::Filho`), notas, cartões e estatísticas;
+2. **Criar** baralhos, notas e cartões (Basic, Cloze e modelos customizados);
+3. **Editar** baralhos (configuração, movimentação de cartões), notas (campos e tags) e estado de cartões;
+4. **Pesquisar** cartões e notas usando toda a sintaxe nativa de busca do Anki (`deck:`, `tag:`, `is:due`, `prop:ivl>=`, etc.);
+5. **Revisar** cartões devidos (*due*) em sessão interativa (chat ou widget do Apps SDK), registrando avaliações `Again` (1), `Hard` (2), `Good` (3) e `Easy` (4) no agendador SM-2/FSRS e acompanhando estatísticas de desempenho.
 
-O ChatGPT se conecta ao servidor como um *connector* (Apps SDK/MCP), com OAuth
-2.1 + PKCE e scopes por operação.
+---
 
-## Por que AnkiConnect (e não AnkiWeb)
+## 2. Restrição Crítica de Domínio: Acesso ao AnkiWeb vs. AnkiConnect
 
-O **AnkiWeb não expõe API REST pública** e o servidor de sync oficial não é uma
-API de dados — o próprio manual do Anki recomenda o AnkiConnect para esse caso
-(ver citações e trade-offs em [`04-adr/ADR-0001-estrategia-acesso-anki.md`](04-adr/ADR-0001-estrategia-acesso-anki.md)).
-O projeto **não** acessa o AnkiWeb, não automatiza login e não armazena
-credenciais do AnkiWeb.
+Conforme documentado oficialmente pela Anki ([AnkiWeb Terms of Service](https://ankiweb.net/account/terms) e [Anki Manual](https://docs.ankiweb.net/)):
 
-## Arquitetura em uma frase
+* **O AnkiWeb não expõe API REST pública.** O protocolo de sincronização do `ankiweb.net` é privado e projetado exclusivamente para os clientes oficiais Anki.
+* **Automação, scraping ou uso de clientes não-oficiais contra o `ankiweb.net` violam os Termos de Uso** e colocam a conta e a coleção do usuário em risco.
 
-ChatGPT → (HTTPS, MCP Streamable HTTP, OAuth 2.1) → **este servidor** →
-(HTTP local, AnkiConnect) → Anki Desktop do usuário. O servidor é *stateless*:
-não persiste conteúdo de cartões.
+Para respeitar integralmente os Termos de Uso do AnkiWeb e da OpenAI e ainda assim entregar um **servidor MCP remoto via HTTPS** acessível pelo ChatGPT em nuvem, o projeto adota uma **arquitetura de adaptadores plugáveis (`AnkiAdapter`)** detalhada no [ADR-0001](./04-adr/ADR-0001-estrategia-acesso-anki.md):
 
-## Público-alvo
+1. **Modo Local / Self-Hosted (`AnkiConnectAdapter`)**: o servidor MCP conversa diretamente com o add-on oficial **AnkiConnect** (código `2055492159`, porta `8765`, protocolo JSON-RPC v6).
+2. **Modo Produção Remota HTTPS + Ponte Reversa (`BridgeRelayAdapter` + CLI `anki-bridge`)**: o servidor MCP roda em produção via HTTPS (Render/Docker) com OAuth 2.1 + PKCE. O usuário executa localmente um agente leve (`npx chatgpt-anki-plugin bridge`) que abre um túnel WebSocket autenticado de saída (`wss://`) até o servidor MCP remoto e encaminha as chamadas JSON-RPC ao AnkiConnect em `127.0.0.1:8765` — **sem abrir portas no roteador, sem expor o AnkiConnect à internet e sem enviar credenciais do AnkiWeb**.
+3. **Modo Sandbox / Demonstração (`InMemoryAnkiAdapter`)**: coleção determinística em memória para revisão da OpenAI, testes de contrato, CI e avaliação imediata sem depender do Anki Desktop aberto.
 
-Estudantes, concurseiros, profissionais de saúde, pesquisadores e usuários
-avançados de Anki que já usam ChatGPT. Secundariamente, desenvolvedores que
-queiram auto-hospedar o servidor (Docker/Fly.io).
+---
 
-## Escopo
+## 3. Público-Alvo
 
-**Dentro do escopo (v0.1)**
+* **Primário**: estudantes universitários, concurseiros, estudantes de medicina/saúde, aprendizes de idiomas e pesquisadores que utilizam Anki diariamente e desejam criar, auditar e revisar cartões assistidos pelo ChatGPT.
+* **Secundário**: desenvolvedores e entusiastas de *spaced repetition* que desejam auto-hospedar um servidor MCP compatível com ChatGPT, Claude Desktop ou qualquer cliente MCP.
 
-- As 13 tools mandatadas + 2 estendidas (`manage_tags`, `update_model_templates`);
-- AnkiConnect local/self-hosted como backend primário; backend `mock` sintético para demo/testes/revisão;
-- OAuth 2.1 (authorization code + PKCE S256), DCR, scopes por operação, rate limit;
-- Widgets do Apps SDK (lista e revisão);
-- Docker, CI/CD, observabilidade (logs estruturados + gancho OTel), runbook;
-- Deploy single-tenant (uma instância por usuário/self-host).
+---
 
-**Fora do escopo (v0.1) — com justificativa**
+## 4. Superfície Pública do Servidor MCP
 
-- **Multi-tenant público** (uma instância atendendo vários usuários com AnkiConnect distinto): roadmap ADR-0008; exige armazenamento cifrado de config por usuário.
-- **Cliente de sync AnkiWeb / scraping**: proibido por política do projeto (ver ADR-0001).
-- **Edição de baralhos granular** (opções de agendamento FSRS por deck): fora das tools v0.1; AnkiConnect não expõe tudo de forma estável.
-- **Renomear decks com subdecks**: limitação do AnkiConnect documentada em `05-tools-mcp.md`.
-- **Refresh tokens**: o connector do ChatGPT re-executa o fluxo de autorização; tokens de 1h.
+### 4.1 As 13 Tools MCP
 
-## Princípios
+| # | Tool | Categoria | Escopo OAuth | Resumo |
+|:--|:-----|:----------|:-------------|:-------|
+| 1 | `list_decks` | Leitura | `anki:read` | Lista todos os baralhos, IDs, hierarquia e contagens (`new`, `learn`, `due`, `total`). |
+| 2 | `get_deck` | Leitura | `anki:read` | Detalha um baralho (estatísticas, sub-baralhos, configuração e amostra de cartões). |
+| 3 | `create_deck` | Escrita | `anki:write` | Cria um baralho ou sub-baralho (`Pai::Filho`). Idempotente. |
+| 4 | `update_deck` | Escrita | `anki:write` | Move cartões para o baralho e/ou atualiza metadados suportados pelo AnkiConnect. |
+| 5 | `delete_deck` | Destrutiva | `anki:delete` | Remove um baralho e seus cartões (`cardsToo: true`), exigindo `confirm: true`. |
+| 6 | `search_cards` | Leitura | `anki:read` | Pesquisa cartões com a sintaxe nativa do Anki e retorna resumo paginado. |
+| 7 | `get_card` | Leitura | `anki:read` | Obtém detalhes completos de um cartão (campos, tags, intervalo, fator, fila, histórico). |
+| 8 | `create_note` | Escrita | `anki:write` | Cria uma nota (`Basic`, `Cloze`, etc.) com validação de campos e controle de duplicatas. |
+| 9 | `update_note` | Escrita | `anki:write` | Atualiza campos e/ou lista de tags de uma nota existente. |
+| 10 | `delete_note` | Destrutiva | `anki:delete` | Exclui uma ou mais notas (e seus cartões), exigindo `confirm: true`. |
+| 11 | `get_due_cards` | Leitura | `anki:read` | Retorna a fila de cartões devidos para revisão imediata, com widget interativo. |
+| 12 | `submit_review` | Escrita | `anki:review` | Registra a resposta (`Again=1`, `Hard=2`, `Good=3`, `Easy=4`) de um cartão em revisão. |
+| 13 | `get_stats` | Leitura | `anki:read` | Retorna métricas consolidadas de estudo, revisões no dia e distribuição de estados. |
 
-1. **Nada de APIs inventadas** — cada capacidade é rastreada a uma ação do AnkiConnect API v6 ou marcada como limitação.
-2. **Stateless por padrão** — nenhum conteúdo de cartão é persistido; sem consentimento explícito não há exceções.
-3. **Erros acionáveis** — toda falha tem código tipado + mensagem + hint (`05-tools-mcp.md`).
-4. **Segurança em profundidade** — OAuth 2.1, scopes por operação, rate limit, validação de Origin, confirmação explícita em operações destrutivas.
-5. **Verificável** — ≥80% de cobertura nos módulos críticos, testes de contrato das tools, smoke E2E, CI com scan de segredos.
+### 4.2 Widgets do OpenAI Apps SDK (`text/html+skybridge`)
 
-## Glossário
+* `ui://widget/deck-browser.html` — Navegador visual de baralhos, estatísticas e cartões pesquisados.
+* `ui://widget/review-session.html` — Sessão interativa de estudo com revelação de resposta e botões *Again / Hard / Good / Easy* integrados a `window.openai.callTool('submit_review', ...)`.
 
-| Termo | Definição |
-|:---|:---|
-| **MCP** | Model Context Protocol (spec 2025-06-18 usada aqui; transporte Streamable HTTP). |
-| **AnkiConnect** | Add-on do Anki Desktop que expõe a coleção via HTTP em `127.0.0.1:8765` (API v6). |
-| **Deck/Baralho** | Pasta de cartões; subdecks usam `Pai::Filho`. |
-| **Note/Nota** | Conteúdo (campos) que gera um ou mais cartões via modelo (note type). |
-| **Model** | Tipo de nota: define campos e templates (frente/verso/CSS). |
-| **Tool** | Função MCP invocável pelo modelo do ChatGPT (ex.: `list_decks`). |
-| **Scope** | Permissão OAuth necessária para uma operação (`anki:read`, `anki:write`, `anki:review`, `anki:admin`). |
-| **Mock backend** | Emulador in-memory do AnkiConnect com coleção 100% sintética (`ANKI_BACKEND=mock`). |
+### 4.3 Endpoints HTTP Expostos
 
-## Critérios de sucesso do projeto (C1–C15)
+| Método e Rota | Descrição |
+|:--------------|:----------|
+| `GET /health` e `GET /healthz` | Healthcheck JSON (`200 OK`) com status do servidor e do adaptador Anki. |
+| `POST /mcp`, `GET /mcp`, `DELETE /mcp` | Endpoint MCP sobre **Streamable HTTP** protegido por OAuth 2.1 Bearer token. |
+| `GET /.well-known/oauth-protected-resource` | Metadados de Recurso Protegido (RFC 9728). |
+| `GET /.well-known/oauth-authorization-server` | Descoberta do Servidor de Autorização OAuth 2.1 (RFC 8414). |
+| `POST /oauth/register` | Dynamic Client Registration (RFC 7591) para o conector do ChatGPT. |
+| `GET /oauth/authorize` & `POST /oauth/authorize` | Fluxo de autorização com PKCE (`S256`) e tela de consentimento de escopos. |
+| `POST /oauth/token` | Troca de código de autorização (PKCE) ou `refresh_token` por JWT assinado. |
+| `GET /oauth/jwks.json` | Chaves públicas para verificação de assinatura. |
+| `WSS /bridge` | Túnel reverso WebSocket autenticado para o agente local `anki-bridge`. |
+| `GET /privacy` e `GET /terms` | Política de Privacidade e Termos de Uso públicos para verificação da OpenAI. |
 
-Os critérios verificáveis do programa estão espelhados no
-[`10-backlog-e-cronograma.md`](10-backlog-e-cronograma.md) § "Pronto quando",
-com o mapeamento de evidência → artefato. O estado atual de cada um é
-reportado em `docs/evidencias/` e no relatório do programa.
+---
+
+## 5. Mapa da Documentação
+
+* [`00-visao-geral.md`](./00-visao-geral.md) — Este documento.
+* [`01-requisitos-funcionais.md`](./01-requisitos-funcionais.md) — Requisitos funcionais (`RF-001` a `RF-015`) com critérios de aceite testáveis.
+* [`02-requisitos-nao-funcionais.md`](./02-requisitos-nao-funcionais.md) — Requisitos não funcionais (`RNF-001` a `RNF-012`).
+* [`03-arquitetura.md`](./03-arquitetura.md) — Dossiê técnico Anki/AnkiConnect/FSRS, arquitetura em camadas e fluxos de dados.
+* [`04-adr/`](./04-adr/) — Registros de Decisão de Arquitetura (`ADR-0001` a `ADR-0006`).
+* [`05-tools-mcp.md`](./05-tools-mcp.md) — Contrato completo das 13 tools MCP, schemas, anotações e erros.
+* [`06-seguranca-e-privacidade.md`](./06-seguranca-e-privacidade.md) — Threat model, OAuth 2.1 + PKCE, LGPD/GDPR, Política de Privacidade e Termos de Uso.
+* [`07-plano-de-testes.md`](./07-plano-de-testes.md) — Estratégia de testes (unitários, integração, contrato, E2E Playwright e cobertura).
+* [`08-runbook-operacional.md`](./08-runbook-operacional.md) — Operação em produção, rotação de segredos, rollback e resposta a incidentes.
+* [`09-submissao-openai.md`](./09-submissao-openai.md) — Dossiê do OpenAI Apps SDK e pacote completo de submissão e revisão.
+* [`10-backlog-e-cronograma.md`](./10-backlog-e-cronograma.md) — Plano de execução com 45 tarefas (`T-001` a `T-045`), estimativas, dependências e status dos marcos.

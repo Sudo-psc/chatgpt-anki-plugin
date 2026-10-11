@@ -1,139 +1,130 @@
-# 08 — Runbook Operacional
+# Runbook Operacional (`docs/08-runbook-operacional.md`)
 
-Público: quem opera uma instância do servidor (self-host ou Fly.io).
-Princípio: o servidor é stateless; incidentes de dados no servidor são
-impossíveis — os incidentes reais são **segredo**, **disponibilidade** e
-**alcance do AnkiConnect**.
+Este runbook descreve os procedimentos operacionais padrão (SOPs) para manter o servidor MCP `chatgpt-anki-plugin` em produção, cobrindo monitoramento, rotação de segredos, rollback, resposta a incidentes de vazamento e indisponibilidade do Anki/AnkiConnect.
 
-## 1. Deploy
+---
 
-### 1.1 Fly.io (produção de referência)
+## 1. Verificação de Saúde e Diagnóstico Rápido
 
-```bash
-fly apps create chatgpt-anki-mcp           # uma vez
-fly secrets set \
-  TOKEN_SECRET="$(openssl rand -base64 48)" \
-  OAUTH_CLIENT_ID=chatgpt
-fly deploy --dockerfile docker/Dockerfile  # ou workflow Deploy (gh)
-curl -fsS https://chatgpt-anki-mcp.fly.dev/health   # {"status":"ok",...}
-```
+### 1.1 Endpoints de Diagnóstico
 
-> O AnkiConnect do usuário não vive no Fly: aponte `ANKI_CONNECT_URL` para o seu
-> túnel privado (Tailscale/cloudflared) ou rode a instância na sua máquina e
-> use o Fly apenas como proxy TLS. **Nunca** exponha o AnkiConnect à Internet
-> aberta sem `apiKey` (ver ADR-0001).
->
-> **Escala — obrigatório 1 machine:** códigos OAuth, clientes DCR e rate limit
-> são em memória por instância (ADR-0007). Com 2+ machines sem sticky sessions,
-> o `code` emitido em uma instância pode ser trocado em outra ⇒ `invalid_grant`
-> (observado no deploy inicial). Mantenha `fly scale count 1`; store
-> compartilhado é o roadmap R-03.
+* **Healthcheck**:
+  ```bash
+  curl -fsSL https://<HOST>/health
+  ```
+  Resposta esperada (`200 OK`):
+  ```json
+  {
+    "status": "ok",
+    "service": "chatgpt-anki-plugin",
+    "version": "0.1.0",
+    "anki": {
+      "backend": "ankiconnect",
+      "reachable": true,
+      "bridgeConnected": false
+    }
+  }
+  ```
+* **Métricas Operacionais**:
+  ```bash
+  curl -fsSL https://<HOST>/metrics
+  ```
+  Retorna contadores de requisições HTTP, chamadas por tool MCP, erros por código e conexões ativas do `anki-bridge`.
 
-### 1.2 Docker Compose (self-host)
+---
 
-```bash
-cp .env.example .env                       # edite TOKEN_SECRET e ANKI_CONNECT_URL
-docker compose -f docker/docker-compose.yml up -d --build
-curl -fsS http://localhost:8080/health
-```
+## 2. Procedimento 1 — Rotação de Segredos (`OAUTH_JWT_SECRET` e `BRIDGE_SHARED_TOKEN`)
 
-### 1.3 Verificação pós-deploy
+Quando realizar: a cada 90 dias, após suspeita de exposição de credenciais ou desligamento de colaborador.
 
-1. `GET /health` → 200 `{"status":"ok"}`.
-2. `GET /ready` → 200 `{"anki":"ok"}` (se 503: ver §4).
-3. `GET /.well-known/oauth-authorization-server` → metadata com issuer correto.
-4. Conectar no ChatGPT (developer mode) ou rodar `bash scripts/smoke.sh`.
+1. **Gerar novos segredos criptográficos**:
+   ```bash
+   NEW_JWT_SECRET=$(openssl rand -hex 32)
+   NEW_BRIDGE_TOKEN=$(openssl rand -hex 32)
+   NewPin=$(openssl rand -base64 18)
+   ```
+2. **Atualizar variáveis de ambiente no provedor de hospedagem (Render / Fly.io / Railway / Docker)**:
+   * Atualizar `OAUTH_JWT_SECRET`, `BRIDGE_SHARED_TOKEN` e `OAUTH_AUTHORIZE_PIN`.
+3. **Reiniciar o serviço (rolling deploy)**:
+   * Todos os tokens JWT emitidos anteriormente são invalidados imediatamente após a troca de `OAUTH_JWT_SECRET`.
+4. **Reconectar clientes**:
+   * No ChatGPT: clicar em **Reconnect** no conector do app para executar novo handshake OAuth 2.1 + PKCE.
+   * Na máquina local (se usar ponte reversa): reiniciar `npx chatgpt-anki-plugin bridge --token <NEW_BRIDGE_TOKEN>`.
+5. **Verificação pós-rotação**:
+   * Testar um token antigo e confirmar retorno `401 Unauthorized`.
+   * Executar `npm run smoke` contra a URL pública.
 
-## 2. Rotação de segredos
+---
 
-| Segredo | Procedimento | Efeito |
-|:---|:---|:---|
-| `TOKEN_SECRET` | `fly secrets set TOKEN_SECRET="$(openssl rand -base64 48)"` (ou editar `.env` + `docker compose up -d`) | **Invalida todos os access tokens**; o ChatGPT re-autoriza automaticamente na próxima chamada (401 → OAuth) |
-| `ANKI_CONNECT_API_KEY` | Alterar no add-on AnkiConnect (Config → apiKey) e depois `fly secrets set ANKI_CONNECT_API_KEY=...` | Chamadas ao Anki passam até o deploy do novo valor |
-| `OAUTH_CLIENT_SECRET` (se usado) | Rotacionar em par com o client; atualizar o connector no ChatGPT | Tokens existentes seguem válidos até expirar |
-| `MCP_DEV_TOKEN` | **Remover em produção**: `fly secrets unset MCP_DEV_TOKEN` | Fecha o bypass de OAuth |
+## 3. Procedimento 2 — Rollback de Deploy em Produção
 
-Verificação pós-rotação: `curl -i /mcp` sem token ⇒ 401 com `WWW-Authenticate`;
-com token antigo ⇒ 401 `invalid_signature`; novo fluxo OAuth ⇒ 200.
+Quando realizar: regressão funcional após deploy, aumento de erros `5xx` (> 2% em 5 min) ou falha no healthcheck `/health`.
 
-## 3. Rollback
+1. **Ativar modo de contenção imediato (se houver risco a dados de cartões)**:
+   * Definir `ANKI_READ_ONLY=1` nas variáveis de ambiente do serviço para bloquear `create_*`, `update_*`, `delete_*` e `submit_review` mantendo leitura ativa.
+2. **Reverter a versão em produção**:
+   * **Via Render Dashboard**: acessar *Service → Deploys*, localizar o último deploy verde e clicar em **Rollback to this deploy**.
+   * **Via Git / GitHub Actions**:
+     ```bash
+     git revert HEAD --no-edit
+     git push origin main
+     ```
+   * **Via Docker**:
+     ```bash
+     docker pull ghcr.io/sudo-psc/chatgpt-anki-plugin:<TAG_ESTAVEL_ANTERIOR>
+     docker compose -f docker/docker-compose.yml up -d
+     ```
+3. **Verificação pós-rollback**:
+   * Confirmar `GET /health` retornando `200 OK` com a versão anterior.
+   * Desativar `ANKI_READ_ONLY=0` somente após validar a causa-raiz em ambiente local.
 
-```bash
-fly releases                                 # listar releases
-fly deploy --image ghcr.io/sudo-psc/chatgpt-anki-plugin:<tag-anterior>
-# ou, via git:
-git checkout <tag-anterior> && fly deploy --dockerfile docker/Dockerfile
-```
+---
 
-Compose: `git checkout <tag> && docker compose -f docker/docker-compose.yml up -d --build`.
-Sem migrações de banco (stateless) ⇒ rollback é seguro por construção.
-Pós-rollback: repetir a verificação §1.3.
+## 4. Procedimento 3 — Resposta a Incidente de Vazamento de Credenciais ou Dados
 
-## 4. Indisponibilidade do Anki / AnkiConnect
+Severidade: **Crítica (SEV-1)**.
 
-**Sintomas:** `/ready` → 503 `anki: unreachable`; tools de leitura/escrita
-retornam `ANKI_UNAVAILABLE` com hint.
+1. **Contenção imediata (T + 0 a 10 min)**:
+   * Rotacionar `OAUTH_JWT_SECRET`, `BRIDGE_SHARED_TOKEN`, `OAUTH_AUTHORIZE_PIN` e `ANKICONNECT_API_KEY` (Seguir Procedimento 1).
+   * Invocar `POST /oauth/revoke` ou reiniciar a instância para limpar códigos/tokens em memória.
+   * Caso o vazamento tenha ocorrido em commit Git: revogar imediatamente o segredo afetado (nunca confiar apenas em `git push --force`).
+2. **Avaliação de Impacto (T + 10 a 30 min)**:
+   * Como o servidor opera em modo *stateless pass-through* (ADR-0004), verificar que nenhum cartão foi persistido em disco.
+   * Auditar logs de acesso (`requestId`, `tool`, `timestamp`, IP de origem) para identificar se ferramentas de leitura (`search_cards`, `get_card`) ou escrita foram chamadas durante a janela de exposição.
+3. **Erradicação e Prevenção (T + 30 a 120 min)**:
+   * Executar `gitleaks detect --source . -v`.
+   * Abrir ADR/post-mortem documentando a linha do tempo, causa-raiz e nova regra de validação.
+   * Notificar usuários afetados conforme prazos da LGPD/GDPR se aplicável.
 
-**Causas comuns e ação:**
+---
 
-1. Anki Desktop fechado no dispositivo do usuário ⇒ reabrir o Anki (o add-on
-   AnkiConnect sobe junto). O AnkiWeb **não é** uma dependência — este projeto
-   não usa o AnkiWeb.
-2. Add-on ausente/desatualizado ⇒ instalar/atualizar (código `2055492159`);
-   conferir porta 8765 em Config.
-3. Rede/túnel (instância remota) ⇒ verificar túnel (Tailscale/cloudflared) e
-   `ANKI_CONNECT_URL`; teste direto:
-   `curl -s -X POST "$ANKI_CONNECT_URL" -d '{"action":"version","version":6}'`.
-4. Timeout sob carga ⇒ elevar `ANKI_TIMEOUT_MS` com cautela (default 10 s).
+## 5. Procedimento 4 — Indisponibilidade do Anki Desktop / AnkiConnect / AnkiWeb
 
-O servidor se recupera sozinho quando o endpoint volta (sem restart). Alertas
-recomendados: `/ready` ≠ 200 por > 5 min (ver §6).
+### Cenário A — Anki Desktop fechado ou AnkiConnect inacessível (`ANKI_UNREACHABLE`)
 
-## 5. Incidentes de segurança
+* **Sintoma**: Tools retornam código `ANKI_UNREACHABLE` (`Could not reach AnkiConnect at http://127.0.0.1:8765`).
+* **Ações de Resolução**:
+  1. Verificar se o aplicativo **Anki Desktop** está aberto e com perfil carregado.
+  2. Em **Ferramentas → Complementos (Add-ons)** no Anki, confirmar que o **AnkiConnect (`2055492159`)** está instalado e habilitado.
+  3. **macOS (App Nap)**: se o Anki parar de responder em segundo plano, executar no terminal:
+     ```bash
+     defaults write net.ichi2.anki NSAppSleepDisabled -bool YES
+     ```
+  4. Testar localmente:
+     ```bash
+     curl -s http://127.0.0.1:8765 -X POST -d '{"action":"version","version":6}'
+     ```
 
-### 5.1 Vazamento de access token
+### Cenário B — Ponte Reversa `anki-bridge` desconectada do servidor HTTPS
 
-1. Rotacionar `TOKEN_SECRET` (§2) — invalida o token vazado imediatamente.
-2. Inspecionar logs (`tool_call` por subject/ms) por uso anômalo.
-3. Se escrito/delete suspeito: orientar o usuário a revisar/restaurar a
-   coleção (backups do Anki; `File → Export` periódico).
+* **Sintoma**: `GET /health` mostra `"bridgeConnected": false`.
+* **Ações de Resolução**:
+  1. Na máquina onde o Anki está aberto, executar:
+     ```bash
+     npx chatgpt-anki-plugin bridge --server wss://<HOST>/bridge --token <BRIDGE_SHARED_TOKEN>
+     ```
+  2. O CLI possui reconexão automática com *exponential backoff* (`1s → 2s → 4s → 15s`).
 
-### 5.2 Vazamento de `ANKI_CONNECT_API_KEY` ou do `TOKEN_SECRET` no repo
+### Cenário C — Indisponibilidade do `ankiweb.net`
 
-1. Rotacionar o segredo no provedor (add-on / env).
-2. Confirmar que `gitleaks` no CI para de acusar; se o segredo entrou no
-   histórico, reescrever histórico (git filter-repo) **ou** rotacionar e marcar
-   o segredo como comprometido (preferível).
-3. Registrar lição no CHANGELOG/CONTRIBUTING se a causa foi template.
-
-### 5.3 Abuso/DoS
-
-1. `RATE_LIMITED` recorrente no log ⇒ baixar `RATE_LIMIT_PER_MINUTE` ou
-   bloquear `sub` na borda (proxy/CDN).
-2. `MAX_BODY_BYTES` protege contra payloads; 413 recorrente ⇒ investigar origem.
-
-## 6. Observabilidade e alertas
-
-- Logs JSON em stdout (`http_request`, `tool_call`, `mcp_transport_error`,
-  `shutdown_started`) — nenhum conteúdo de cartão (política NFR-04).
-- `/health` = liveness (sem dependências) · `/ready` = dependência AnkiConnect.
-- **Alertas mínimos:** `/ready` ≠ 200 por 5 min; taxa de `error`/`ANKI_UNAVAILABLE`
-  > 5%/5 min; p95 de `http_request.ms` > 2,5 s/15 min.
-- **OpenTelemetry (quando necessário):** `withSpan` (`src/infra/telemetry.ts`) é
-  o ponto único; adicionar `@opentelemetry/sdk-node` + exporter OTLP e trocar a
-  implementação mantendo os atributos (`span`, `ok`, `ms`). Dashboards: taxa de
-  tool_call por código de erro, latência p95 por tool, chamadas por subject.
-
-## 7. Manutenção rotineira
-
-| Frequência | Ação |
-|:---|:---|
-| Semanal | Revisar logs de erro; confirmar CI verde em `main` |
-| Mensal | `npm audit`/Dependabot; atualizar AnkiConnect se `unsupported action` aparecer; rodar teste de carga (T-027) |
-| Por release | Atualizar CHANGELOG + `SERVER_VERSION`, tag SemVer, smoke pós-deploy |
-| Semestral | Revisar política de privacidade e escopos; revisar DCR/allowlist |
-
-## 8. Contatos
-
-- Segurança: philipe.saraiva.cruz@gmail.com (ver `SECURITY.md`).
-- Issues: <https://github.com/Sudo-psc/chatgpt-anki-plugin/issues>.
+* **Impacto**: Como todas as 13 tools operam contra a coleção local via AnkiConnect (e não dependem do `ankiweb.net` em tempo de requisição), **o plugin continua 100% funcional durante quedas do AnkiWeb**. A sincronização com a nuvem do AnkiWeb ocorrerá normalmente quando o serviço da Ankitects voltar ao ar.

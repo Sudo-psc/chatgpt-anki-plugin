@@ -1,130 +1,175 @@
-# 01 — Requisitos Funcionais
+# Requisitos Funcionais (`RF-001` a `RF-015`)
 
-Cada requisito tem critério de aceite **testável** e rastreabilidade para a
-tool MCP e para a suíte de testes. Verificação: `npm run test:contract` e
-`npm run test:integration` (arquivos `tests/contract/`, `tests/integration/`).
+Todos os requisitos abaixo possuem critérios de aceite objetivos e verificáveis por testes automatizados em `tests/unit`, `tests/integration`, `tests/contract` e `tests/e2e`.
 
-## FR-01 — Listar baralhos e sub-baralhos
+---
 
-- **Descrição:** o usuário lista todos os baralhos, incluindo sub-baralhos
-  (`Pai::Filho`), com id e baralho-pai derivado.
-- **Tool:** `list_decks` (scope `anki:read`).
-- **Critério de aceite:** com a coleção sintética, a resposta contém os 6
-  baralhos (incluindo `Estudos` e `Estudos::Anatomia`), cada item com
-  `id`, `name`, `parent` (ex.: `"Estudos::Anatomia"` → `parent = "Estudos"`).
-- **Teste:** `tests/integration/mcp-tools.test.ts` › *list_decks returns seeded decks with parents and subdecks*; contrato de saída em `tests/contract`.
+## RF-001 — Listar Baralhos e Hierarquia (`list_decks`)
 
-## FR-02 — Detalhar baralho
+* **Descrição**: O sistema deve listar todos os baralhos da coleção Anki do usuário, preservando a hierarquia de sub-baralhos separada por `::` (ex.: `Medicina::Cardiologia::Arritmias`) e informando a contagem de cartões novos (`newCount`), em aprendizagem (`learnCount`), para revisão (`reviewCount` / `dueCount`) e total (`totalCards`).
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `list_decks`.
+* **Critérios de Aceite**:
+  1. Dado que existem os baralhos `Default`, `Idiomas` e `Idiomas::Inglês`, quando `list_decks` é invocado sem filtro, retorna os 3 baralhos com `id`, `name`, `parentName`, `depth` e contagens numéricas não-negativas.
+  2. Quando o parâmetro opcional `query` é informado (ex.: `"Idiomas"`), apenas baralhos cujo nome contém a substring (case-insensitive) são retornados.
+  3. O resultado inclui `structuredContent.decks` e `_meta["openai/outputTemplate"] = "ui://widget/deck-browser.html"`.
 
-- **Descrição:** detalhes de um baralho por nome exato: id, pai, sub-baralhos
-  (nomes) e estatísticas (new/learn/review/total, incluindo descendentes).
-- **Tool:** `get_deck` (scope `anki:read`).
-- **Critério de aceite:** `get_deck("Estudos")` retorna `subdecks = ["Estudos::Anatomia", "Estudos::Farmacologia"]` e `stats.total_in_deck ≥ 3`; nome inexistente retorna erro `NOT_FOUND` com hint.
-- **Teste:** `mcp-tools.test.ts` › *get_deck returns stats and subdecks…*.
+---
 
-## FR-03 — Criar baralho
+## RF-002 — Consultar Detalhes de um Baralho (`get_deck`)
 
-- **Descrição:** cria baralho ou sub-baralho; repetir a chamada com o mesmo nome é idempotente (retorna o existente).
-- **Tool:** `create_deck` (scope `anki:write`).
-- **Critério de aceite:** duas chamadas com `"Provas::Farmacologia"` retornam o **mesmo id**; o deck-pai implícito (`Provas`) passa a existir.
-- **Teste:** *create_deck is idempotent…*.
+* **Descrição**: O sistema deve retornar as informações detalhadas de um baralho específico (por nome), incluindo estatísticas de fila, lista de sub-baralhos diretos, informações de configuração (`getDeckConfig`) e uma amostra opcional de cartões pertencentes ao baralho.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `get_deck`.
+* **Critérios de Aceite**:
+  1. Dado um baralho existente, `get_deck({ deckName: "Idiomas::Inglês" })` retorna `id`, `name`, contagens de cartões, `subdecks`, `config` e `sampleCards` (respeitando `sampleLimit`, padrão 10, máx. 50).
+  2. Se o baralho não existir na coleção, a tool retorna erro tipado `DECK_NOT_FOUND` (`isError: true`) com mensagem orientando o uso de `list_decks`.
 
-## FR-04 — Editar baralho (renomear)
+---
 
-- **Descrição:** renomeia um baralho movendo seus cartões para o novo nome
-  (decisão composta adversarialmente documentada em `05-tools-mcp.md`).
-- **Tool:** `update_deck` (scope `anki:write`).
-- **Critério de aceite:** após renomear `Temporario` → `Renomeado`, `deck:Renomeado` encontra o cartão movido, `get_deck("Temporario")` retorna `NOT_FOUND`; renomear para nome existente retorna `CONFLICT`; renomear deck com subdecks retorna `CONFLICT` com mensagem explicando a limitação.
-- **Teste:** *update_deck renames and moves cards* + *update_deck reports CONFLICT…*.
+## RF-003 — Criar Baralho e Sub-baralho (`create_deck`)
 
-## FR-05 — Excluir baralho (destrutivo, com confirmação)
+* **Descrição**: O sistema deve permitir criar novos baralhos de topo ou sub-baralhos na notação `Pai::Filho`.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `create_deck`.
+* **Critérios de Aceite**:
+  1. `create_deck({ deckName: "Concursos::Direito Constitucional" })` retorna o `deckId` numérico retornado pelo AnkiConnect e `created: true`.
+  2. A operação é idempotente: chamar `create_deck` para um baralho já existente retorna o `deckId` existente sem duplicar nem corromper cartões.
+  3. Nomes vazios, apenas espaços ou contendo `::::` consecutivos são rejeitados pela validação Zod antes de chamar o backend.
+  4. Se `ANKI_READ_ONLY=1`, a chamada é bloqueada com erro `READ_ONLY_MODE`.
 
-- **Descrição:** exclui baralho e todos os seus cartões (`cardsToo=true`).
-- **Tool:** `delete_deck` (scope `anki:write`).
-- **Critério de aceite:** sem `confirm=true` → `VALIDATION_ERROR` explicando o motivo; com confirmação → `deleted=true` e o baralho deixa de existir.
-- **Teste:** *delete_deck requires confirm and deletes with it*.
+---
 
-## FR-06 — Pesquisar cartões e notas (sintaxe Anki)
+## RF-004 — Atualizar Baralho e Mover Cartões (`update_deck`)
 
-- **Descrição:** busca com sintaxe nativa (`deck:`, `tag:`, `is:due|new|learn|review`, texto livre) com limite e contagem total.
-- **Tool:** `search_cards` (scope `anki:read`).
-- **Critério de aceite:** `tag:farmacologia` → `total = 2` com tags e respostas em texto puro (HTML removido); `limit=1` → `returned = 1` com `total` completo; query sem resultados → `total = 0`, lista vazia (sem erro).
-- **Teste:** *search_cards supports tag queries, limits and empty results*.
+* **Descrição**: O sistema deve permitir mover um conjunto de cartões para um baralho de destino (`changeDeck`) e/ou renomear logicamente um baralho migrando seus cartões para o novo nome (`newName`), documentando explicitamente que o AnkiConnect não possui ação atômica nativa de renomeação sem movimentação.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `update_deck`.
+* **Critérios de Aceite**:
+  1. Ao informar `deckName` e `cardIds: [101, 102]`, os cartões especificados passam a pertencer a `deckName` via `changeDeck`.
+  2. Ao informar `deckName` e `newName`, o sistema cria `newName`, move todos os cartões de `deckName` para `newName` e (se `removeOldDeck: true`) remove o baralho antigo vazio, retornando a contagem de cartões migrados.
+  3. Se nem `cardIds` nem `newName` forem informados, retorna erro de validação acionável (`INVALID_ARGUMENTS`).
 
-## FR-07 — Visualizar cartão individual
+---
 
-- **Descrição:** detalhes de um cartão: baralho, modelo, pergunta/resposta (texto puro), agendamento (due, intervalo, fila, tipo, estado) e tags da nota.
-- **Tool:** `get_card` (scope `anki:read`).
-- **Critério de aceite:** id válido retorna `card_id` correspondente e `state ∈ {new,learning,review,relearning,suspended}`; id inexistente → `NOT_FOUND`.
-- **Teste:** *get_card returns card details and NOT_FOUND for missing ids*.
+## RF-005 — Excluir Baralho com Confirmação Explícita (`delete_deck`)
 
-## FR-08 — Criar nota
+* **Descrição**: O sistema deve permitir excluir um baralho e seus cartões (`deleteDecks` com `cardsToo: true`), exigindo confirmação explícita na chamada para prevenir perda acidental de dados.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `delete_deck`.
+* **Critérios de Aceite**:
+  1. Se `confirm` não for `true`, a operação falha imediatamente com `CONFIRMATION_REQUIRED` sem invocar o AnkiConnect.
+  2. A tentativa de excluir o baralho padrão `"Default"` sem `allowDefault: true` é rejeitada com `PROTECTED_DECK`.
+  3. Para um baralho existente com `confirm: true`, o baralho deixa de aparecer em `list_decks` e a tool retorna `{ deleted: true, deckName }`.
 
-- **Descrição:** cria nota com `deck`, `model`, `fields`, `tags`; deck inexistente é criado automaticamente; duplicatas são rejeitadas salvo `allow_duplicate=true`.
-- **Tool:** `create_note` (scope `anki:write`).
-- **Critério de aceite:** primeira criação retorna `note_id`; repetição idêntica → `ANKI_ERROR` com mensagem de duplicata; com `allow_duplicate=true` → sucesso; modelo inexistente → `ANKI_ERROR` citando o modelo e hint.
-- **Teste:** *create_note creates the deck if needed…* + *create_note surfaces unknown models…*.
+---
 
-## FR-09 — Editar nota e gerenciar tags
+## RF-006 — Pesquisar Cartões com Sintaxe Nativa do Anki (`search_cards`)
 
-- **Descrição:** atualiza campos (merge parcial), substitui a lista completa de
-  tags, troca o modelo; `manage_tags` faz add/remove/replace/list/clear_unused.
-- **Tools:** `update_note`, `manage_tags` (scope `anki:write`).
-- **Critério de aceite:** `update_note` sem `fields/tags/model` → `VALIDATION_ERROR`; após `tags: ["anatomia","atualizado"]`, busca por `tag:atualizado` encontra a nota; `manage_tags add/remove/replace/clear_unused` refletem em buscas; `add` sem tags/ids → `VALIDATION_ERROR`.
-- **Teste:** *update_note merges fields…* + *manage_tags lists, adds, removes…*.
+* **Descrição**: O sistema deve pesquisar cartões usando qualquer query válida da sintaxe de busca do Anki (`deck:`, `tag:`, `is:due`, `is:new`, `is:suspended`, `prop:ivl>=`, `rated:`, buscas por campo `Front:*termo*`) e retornar cartões enriquecidos com frente/verso resumidos, tags, baralho, estado e intervalo.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `search_cards`.
+* **Critérios de Aceite**:
+  1. `search_cards({ query: "deck:Default is:due", limit: 20, offset: 0 })` executa `findCards` + `cardsInfo` e retorna `{ total, offset, limit, hasMore, cards }`.
+  2. Cada item em `cards` contém `cardId`, `noteId`, `deckName`, `modelName`, `fields`, `tags`, `queue`, `type`, `interval`, `factor`, `reps`, `lapses` e `due`.
+  3. Suporta paginação (`limit` de 1 a 100, padrão 25; `offset >= 0`) para respeitar os limites de payload do ChatGPT.
 
-## FR-10 — Excluir nota (destrutivo, com confirmação)
+---
 
-- **Descrição:** exclui até 100 notas e seus cartões; reporta ids inexistentes.
-- **Tool:** `delete_note` (scope `anki:write`).
-- **Critério de aceite:** sem confirmação → `VALIDATION_ERROR`; com confirmação, resposta separa `deleted` e `not_found` corretamente.
-- **Teste:** *delete_note requires confirm and reports not_found ids*.
+## RF-007 — Consultar Cartão Individual e Histórico (`get_card`)
 
-## FR-11 — Listar cartões devidos
+* **Descrição**: O sistema deve retornar todos os atributos de um cartão específico (`cardId`), os campos completos e tags de sua nota associada (`noteId`), e opcionalmente o histórico de revisões (`getReviewsOfCards`).
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `get_card`.
+* **Critérios de Aceite**:
+  1. `get_card({ cardId })` retorna os campos completos sem truncamento, tags da nota, métricas de agendamento e lista de revisões anteriores.
+  2. Caso `cardId` não exista, retorna erro `CARD_NOT_FOUND` com `isError: true`.
 
-- **Descrição:** cartões vencidos (`is:due`), opcionalmente por baralho
-  (incluindo subdecks), com contagem total e limite.
-- **Tool:** `get_due_cards` (scope `anki:review`).
-- **Critério de aceite:** coleção sintética → `total_due ≥ 4`; com `deck="Estudos::Anatomia"` todos os retornados pertencem ao baralho ou descendentes.
-- **Teste:** *get_due_cards scopes by deck including subdecks*.
+---
 
-## FR-12 — Submeter revisão
+## RF-008 — Criar Nota e Cartões (`create_note`)
 
-- **Descrição:** responde um cartão com `again|hard|good|easy` (ease 1–4),
-  reagendando via agendador (AnkiConnect `answerCards`).
-- **Tool:** `submit_review` (scope `anki:review`).
-- **Critério de aceite:** resposta `good` → `answered=true`; `reviewed_today` incrementa; cartão inexistente → `NOT_FOUND`; AnkiConnect antigo → `ANKI_ERROR` com hint de atualização do add-on.
-- **Teste:** *submit_review answers a due card…* + *submit_review maps unknown cards…* + caso `unsupported action` em `tests/unit/tool-errors.test.ts`.
+* **Descrição**: O sistema deve criar uma nova nota em um baralho e modelo especificados (`Basic`, `Cloze`, ou qualquer modelo existente na coleção), preenchendo seus campos e tags e controlando duplicatas.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `create_note`.
+* **Critérios de Aceite**:
+  1. `create_note({ deckName, modelName: "Basic", fields: { Front: "...", Back: "..." }, tags: ["anatomia"] })` cria a nota e retorna `{ noteId, deckName, modelName, tags }`.
+  2. Quando `allowDuplicate: false` (padrão) e já existe nota com o mesmo primeiro campo no escopo configurado, retorna erro tipado `DUPLICATE_NOTE`.
+  3. Se o baralho ainda não existir e `createDeckIfMissing: true` (padrão), o baralho é garantido antes da inserção.
 
-## FR-13 — Estatísticas de estudo
+---
 
-- **Descrição:** revisões de hoje + contagens new/learning/review/due na
-  coleção ou em um baralho (com stats da árvore de decks).
-- **Tool:** `get_stats` (scope `anki:read`).
-- **Critério de aceite:** coleção → `counts.due_count ≥ 4`; baralho válido → `deck` ecoado + `deck_stats` presente; baralho inexistente → contagens zero **sem erro** (não confundir com falha).
-- **Teste:** *get_stats reports collection and deck-scoped counts*.
+## RF-009 — Atualizar Campos e Tags de uma Nota (`update_note`)
 
-## FR-14 — Gerenciar templates de modelos (admin)
+* **Descrição**: O sistema deve atualizar os campos (`fields`) e/ou as tags (`tags`, `addTags`, `removeTags`) de uma nota existente identificada por `noteId`.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `update_note`.
+* **Critérios de Aceite**:
+  1. `update_note({ noteId, fields: { Back: "Novo verso" }, addTags: ["revisado"], removeTags: ["rascunho"] })` atualiza a nota e retorna o estado atualizado via `notesInfo`.
+  2. Se `noteId` não existir, retorna `NOTE_NOT_FOUND`.
+  3. Se nenhuma alteração (`fields`, `tags`, `addTags`, `removeTags`) for fornecida, retorna `INVALID_ARGUMENTS`.
 
-- **Descrição:** atualiza frente/verso/CSS de um modelo de nota; exige
-  `template_name` quando há múltiplos templates.
-- **Tool:** `update_model_templates` (scope `anki:admin` — **não** concedido por padrão).
-- **Critério de aceite:** CSS atualizado → `css_updated=true`; template atualizado → `templates_updated=["Card 1"]`; sem mudanças → `VALIDATION_ERROR`; modelo/template inexistente → `NOT_FOUND`; modelo multi-template sem `template_name` → `VALIDATION_ERROR` citando as opções.
-- **Teste:** *updates css and templates…* + *requires template_name when the model has multiple templates*.
+---
 
-## Rastreabilidade resumida
+## RF-010 — Excluir Notas com Confirmação (`delete_note`)
 
-| Requisito | Tool | Scope | Suíte |
-|:---|:---|:---|:---|
-| FR-01..05 | list/get/create/update/delete_deck | read/write | integration + contract |
-| FR-06..07 | search_cards, get_card | read | integration + contract |
-| FR-08..10 | create/update/delete_note, manage_tags | write | integration + contract |
-| FR-11..12 | get_due_cards, submit_review | review | integration + contract |
-| FR-13 | get_stats | read | integration + contract |
-| FR-14 | update_model_templates | admin | integration + auth |
+* **Descrição**: O sistema deve excluir uma ou mais notas (e todos os cartões gerados por elas) via `deleteNotes`, exigindo `confirm: true`.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `delete_note`.
+* **Critérios de Aceite**:
+  1. Sem `confirm: true`, falha com `CONFIRMATION_REQUIRED`.
+  2. Com `confirm: true` e `noteIds: [123]`, verifica a existência, remove as notas no Anki e retorna `{ deletedNoteIds, count }`.
 
-## Fora de escopo v0.1 (requisitos adiados)
+---
 
-- FR-15 (proposto): import/export de pacotes `.apkg` — requer decisões de armazenamento; T-045 no backlog.
-- FR-16 (proposto): agendamento customizado/FSRS por deck — dependente de ações estáveis no AnkiConnect.
-- FR-17 (proposto): multi-tenant público — ver ADR-0008.
+## RF-011 — Obter Fila de Cartões Devidos para Revisão (`get_due_cards`)
+
+* **Descrição**: O sistema deve listar os cartões pendentes de revisão imediata (`is:due`) globalmente ou filtrados por baralho/tag, prontos para estudo no chat ou no widget de revisão do Apps SDK.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `get_due_cards`.
+* **Critérios de Aceite**:
+  1. `get_due_cards({ deckName: "Default", limit: 10, includeNew: true })` retorna os cartões devidos (e novos, se `includeNew: true`), com `question`, `answer`, `fields`, `tags`, `interval` e opções de resposta `1..4`.
+  2. A tool anexa `_meta["openai/outputTemplate"] = "ui://widget/review-session.html"` para renderização do widget de revisão no ChatGPT.
+
+---
+
+## RF-012 — Registrar Avaliação de Revisão (`submit_review`)
+
+* **Descrição**: O sistema deve registrar a avaliação do usuário para um cartão (`cardId`) usando a escala oficial do Anki/FSRS/SM-2: `1` (`Again` / Errei), `2` (`Hard` / Difícil), `3` (`Good` / Bom), `4` (`Easy` / Fácil).
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `submit_review`.
+* **Critérios de Aceite**:
+  1. Aceita `rating` numérico (`1 | 2 | 3 | 4`) ou textual (`"again" | "hard" | "good" | "easy"`, case-insensitive) e converte para `ease` `1..4` na chamada `answerCards`.
+  2. Retorna `{ cardId, ease, ratingLabel, success: true, updatedCard }` com o novo intervalo do cartão após a resposta.
+  3. Valores fora de `1..4` são rejeitados pela validação de schema.
+
+---
+
+## RF-013 — Obter Estatísticas da Coleção e Desempenho (`get_stats`)
+
+* **Descrição**: O sistema deve retornar métricas consolidadas de estudo: cartões revisados hoje (`getNumCardsReviewedToday`), histórico recente por dia (`getNumCardsReviewedByDay`), distribuição de cartões (`is:new`, `is:learn`, `is:review`, `is:suspended`, `is:due`) e estatísticas por baralho.
+* **Prioridade**: Alta (Must Have).
+* **Tool MCP associada**: `get_stats`.
+* **Critérios de Aceite**:
+  1. `get_stats({ deckName?: string, days?: number })` retorna `reviewedToday`, `reviewsByDay` (últimos `days` dias, padrão 7), `totals` (`new`, `learning`, `review`, `due`, `suspended`, `total`) e `decks`.
+
+---
+
+## RF-014 — Autenticação OAuth 2.1 com PKCE e Escopos por Operação
+
+* **Descrição**: O servidor MCP deve autenticar clientes via OAuth 2.1 com PKCE (`S256`), suportar descoberta automática (`/.well-known/oauth-protected-resource` e `/.well-known/oauth-authorization-server`), registro dinâmico de clientes (`/oauth/register`) e aplicar escopos granulares (`anki:read`, `anki:write`, `anki:delete`, `anki:review`).
+* **Prioridade**: Alta (Must Have).
+* **Critérios de Aceite**:
+  1. Requisição a `POST /mcp` sem header `Authorization: Bearer <token>` (quando `MCP_ALLOW_UNAUTHENTICATED=0`) retorna `401 Unauthorized` com header `WWW-Authenticate` apontando para `resource_metadata`.
+  2. Token válido apenas com escopo `anki:read` consegue executar `list_decks`, mas recebe erro de permissão insuficiente ao invocar `create_note` ou `delete_deck`.
+  3. Fluxo completo `/oauth/register` → `/oauth/authorize` (PKCE `S256`) → `/oauth/token` emite JWT válido aceito em `/mcp`.
+
+---
+
+## RF-015 — Widgets Interativos do OpenAI Apps SDK (`text/html+skybridge`)
+
+* **Descrição**: O servidor MCP deve registrar recursos de UI compatíveis com o OpenAI Apps SDK (`ui://widget/deck-browser.html` e `ui://widget/review-session.html`) que hidratam dados a partir de `window.openai.toolOutput` e disparam ações de volta ao ChatGPT via `window.openai.callTool`.
+* **Prioridade**: Média (Should Have — requerido para C10 e M4).
+* **Critérios de Aceite**:
+  1. `resources/list` expõe os dois widgets com `mimeType: "text/html+skybridge"`.
+  2. Em navegador headless (Playwright), o widget `review-session.html` renderiza a frente do cartão recebido em `window.openai.toolOutput`, revela o verso ao clicar em "Mostrar resposta" e invoca `window.openai.callTool("submit_review", { cardId, rating })` ao clicar em um dos 4 botões de avaliação.

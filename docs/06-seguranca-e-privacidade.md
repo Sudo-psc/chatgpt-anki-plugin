@@ -1,79 +1,57 @@
-# 06 — Segurança e Privacidade
+# Segurança, Privacidade e Termos de Uso (`docs/06-seguranca-e-privacidade.md`)
 
-Documento de referência de segurança; política voltada ao usuário final em
-[`legal/politica-de-privacidade.md`](legal/politica-de-privacidade.md).
+---
 
-## Modelo de ameaça (STRIDE)
+## 1. Modelo de Ameaças (Threat Model — STRIDE)
 
-| Ameaça | Vetor concreto | Controle implementado |
-|:---|:---|:---|
-| **S**poofing | Chamada a `/mcp` sem token / token forjado | Bearer obrigatório; HS256 com segredo ≥32 bytes; assinatura `timingSafeEqual`; 401 com `WWW-Authenticate` |
-| **T**ampering | Alterar payload de token ou código OAuth | Assinatura HMAC; código de uso único vinculado a client+redirect+challenge; PKCE S256 |
-| **R**epudiation | Negar ação destrutiva | Logs estruturados por tool call (subject, tool, resultado); `confirm=true` obrigatório em delete_* |
-| **I**nfo disclosure | Vazamento de conteúdo de cartões/tokens | Stateless (ADR-0004); logs sem conteúdo + redação/truncamento; tokens nunca logados; `Cache-Control: no-store` no token endpoint |
-| **D**oS | Flood em `/mcp` | Body limit (413), rate limit por subject (RATE_LIMITED), timeouts do cliente Anki (10 s) |
-| **E**oP | Usuário comum virar "admin" | Scopes por operação; `anki:admin` fora do default; validação de `aud`/`iss`/`exp` |
-| DNS rebinding | Servidor alcançado por origem maliciosa | Validação de `Origin` (403) — exigida pela spec MCP; bind local em dev |
-| Replay de código OAuth | Reuso de `code` | Códigos de uso único, TTL 60 s, revogados até em tentativa falha |
+| ID | Ameaça (STRIDE) | Vetor | Mitigação Implementada |
+|:---|:----------------|:------|:-----------------------|
+| **TM-01** | **Spoofing** (Falsificação de identidade) | Cliente não autorizado tenta invocar `/mcp` ou interceptar código OAuth. | OAuth 2.1 com **PKCE (`S256`) obrigatório**; tokens JWT assinados (`HS256`) validados em cada request; comparação de segredos com `crypto.timingSafeEqual`. |
+| **TM-02** | **Tampering** (Adulteração / Exclusão acidental de coleção) | Prompt injection em cartão ou alucinação do LLM tenta apagar baralhos/notas. | Separação de escopos OAuth (`anki:read`, `anki:write`, `anki:review`, `anki:delete`); parâmetro `confirm: true` obrigatório em `delete_deck` e `delete_note`; proteção de `Default`; modo global `ANKI_READ_ONLY=1`. |
+| **TM-03** | **Information Disclosure** (Vazamento de cartões em logs ou banco) | Conteúdo de flashcards gravado em logs de aplicação ou cache em nuvem. | Arquitetura *stateless pass-through* (zero persistência em disco); redação automática de campos sensíveis no logger (`src/infra/logger.ts`). |
+| **TM-04** | **Information Disclosure** (Exposição da porta 8765 do AnkiConnect) | Usuário abre a porta 8765 diretamente no roteador para a internet sem TLS/Auth. | Uso da ponte reversa **`anki-bridge`** (conexão de saída `wss://` autenticada com `BRIDGE_SHARED_TOKEN`), mantendo o AnkiConnect restrito a `127.0.0.1:8765`. |
+| **TM-05** | **Denial of Service** (Exaustão de recursos / payloads gigantes) | Query `search_cards` retorna dezenas de milhares de cartões ou flood em `/oauth/token`. | Paginação forçada (`limit <= 100`), truncamento seguro de pré-visualização, timeout (`ANKICONNECT_TIMEOUT_MS`) e *rate limiting* por IP (`express-rate-limit`). |
+| **TM-06** | **Elevation of Privilege** (Escalada de escopo) | Token emitido apenas para leitura tenta criar ou apagar notas. | Verificação de escopo por tool (`requireScope`) antes da execução do handler da tool. |
 
-## Autenticação e autorização
+---
 
-- **OAuth 2.1**: authorization code + PKCE S256 (obrigatório), DCR restrito por
-  allowlist exata de redirect URIs, consentimento com escopos em pt-BR.
-- **Scopes por operação** (`anki:read|write|review|admin`), enforcement no
-  handler de cada tool (ADR-0003); mapa completo em `05-tools-mcp.md`.
-- **Tokens**: HS256/`node:crypto`, TTL 1 h, claims `sub/scope/iss/aud/iat/exp`;
-  rotação de `TOKEN_SECRET` invalida tudo (runbook).
-- **Dev token** (`MCP_DEV_TOKEN`) ignora OAuth por design — proibido em
-  produção (warn em log; documentado no `.env.example`).
+## 2. Arquitetura OAuth 2.1 + PKCE e Escopos
 
-## Dados e privacidade (LGPD/GDPR)
+O servidor implementa as especificações exigidas pelo OpenAI Apps SDK e pelo protocolo MCP:
 
-| Categoria | Tratada? | Onde vive | Retenção no servidor |
-|:---|:---|:---|:---|
-| Conteúdo de cartões/notas | Sim (pass-through) | Anki do usuário ↔ resposta da tool | **Zero** (nunca persistido) |
-| Identificador OAuth (`sub` = "owner") | Sim (metadados) | Claims do token / logs | Vida do log operacional |
-| Endereço do AnkiConnect + apiKey | Sim (config de operador) | Env do servidor | Vida da instância |
-| Credenciais do AnkiWeb | **Não** | — | — |
+* **RFC 9728 (OAuth 2.0 Protected Resource Metadata)**: `GET /.well-known/oauth-protected-resource` informa `resource`, `authorization_servers` e `scopes_supported`.
+* **RFC 8414 (OAuth 2.0 Authorization Server Metadata)**: `GET /.well-known/oauth-authorization-server` publica `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `revocation_endpoint`, `jwks_uri`, `code_challenge_methods_supported: ["S256"]`.
+* **RFC 7591 (Dynamic Client Registration)**: `POST /oauth/register` registra dinamicamente o cliente do ChatGPT e valida os `redirect_uris`.
+* **RFC 7636 (PKCE `S256`)**: `BASE64URL(SHA256(code_verifier)) === code_challenge` verificado em `POST /oauth/token`. Códigos de autorização são de uso único e expiram em 5 minutos.
 
-- Base legal: execução do serviço solicitado pelo próprio usuário (dono da
-  instância); sem perfis de usuário finais, sem telemetria externa, sem
-  compartilhamento com terceiros.
-- Direitos do titular: não há conteúdo para exportar/excluir no servidor;
-  exclusão de logs operacionais mediante solicitação ao operador.
-- Fixtures/exemplos/screenshots: **somente** coleção sintética
-  (`src/anki/mock/seed.ts`) — regra no CONTRIBUTING.
+---
 
-## Segredos e cadeia de suprimentos
+## 3. Conformidade com LGPD (Lei nº 13.709/2018) e GDPR (UE 2016/679)
 
-- Segredos apenas via env/secret manager; `.env` no `.gitignore`;
-  `.env.example` com placeholders.
-- `gitleaks` no CI (working tree + histórico completo) com allowlist restrita a
-  placeholders documentados.
-- `npm ci` com lockfile; SBOM SPDX gerado no CI (syft); Dependabot recomendado
-  (T-041).
-- Imagem Docker non-root (`USER node`), multi-stage, sem toolchain no runtime.
+1. **Finalidade e Necessidade**: os dados de cartões transitam pelo servidor MCP única e exclusivamente para atender ao comando imediato do titular no ChatGPT.
+2. **Minimização e Retenção Zero**: em operação normal (`ankiconnect` / `bridge`), nenhum conteúdo de nota ou cartão é armazenado em banco de dados do servidor.
+3. **Transparência e Direitos do Titular**: o usuário pode revogar tokens a qualquer momento (`POST /oauth/revoke`), desconectar o agente local (`Ctrl+C` no `anki-bridge`) ou ativar `ANKI_READ_ONLY=1`.
 
-## Superfície de rede (notas de operação)
+---
 
-- Em dev, bind em localhost é o default recomendado; para exposição pública
-  use HTTPS (Fly/Proxy com TLS) — o servidor não termina TLS sozinho.
-- `/health` não exige token (liveness); `/ready` também é público mas apenas
-  devolve estado do AnkiConnect (sem dados).
-- `/widgets/*` serve somente 5 arquivos em allowlist, com CSP restritiva.
-- **Nunca** expor o AnkiConnect diretamente à Internet sem `apiKey` e rede
-  privada/túnel (ADR-0001).
+## 4. Política de Privacidade Pública (Servida em `GET /privacy`)
 
-## Resposta a incidentes (resumo)
+* **Controlador / Operador**: Projeto open-source `chatgpt-anki-plugin` (MIT).
+* **Dados Processados**:
+  * Nomes de baralhos, notas, campos de cartões, tags e estatísticas de revisão enviados em tempo real entre a instância Anki do usuário e a sessão ativa do ChatGPT.
+  * Metadados técnicos operacionais: identificadores de requisição (`requestId`), timestamp, nome da tool invocada, latência em milissegundos e status de sucesso/erro.
+* **Armazenamento e Retenção**:
+  * **Zero retenção de flashcards**: o servidor MCP processa os cartões exclusivamente em memória volátil durante a requisição HTTP (*stateless pass-through*).
+  * **Credenciais**: o servidor **jamais solicita ou armazena** usuário ou senha do `ankiweb.net`.
+* **Compartilhamento com Terceiros**: os dados retornados pelas tools MCP são entregues unicamente ao cliente MCP autenticado pelo próprio usuário (ex.: ChatGPT da OpenAI, sujeito à Política de Privacidade da OpenAI). Não há venda de dados, anúncios ou rastreadores.
+* **Segurança**: comunicação criptografada via HTTPS/TLS 1.2+ e WSS, autenticação OAuth 2.1 com PKCE (`S256`) e escopos granulares.
+* **Contato e Revogação**: o usuário pode revogar o acesso a qualquer momento nas configurações de Apps/Conectores do ChatGPT ou pelo endpoint `/oauth/revoke`.
 
-1. Suspeita de vazamento de token ⇒ rotação de `TOKEN_SECRET` (invalida todos)
-   + revisão de logs; passos completos no runbook.
-2. Vazamento de `ANKI_CONNECT_API_KEY` ⇒ rotacionar a chave no add-on.
-3. Vulnerabilidade reportada ⇒ fluxo do `SECURITY.md` (contato privado).
+---
 
-## Verificação
+## 5. Termos de Uso Públicos (Servidos em `GET /terms`)
 
-- `tests/integration/auth.test.ts` — 401s, PKCE, single-use, scopes, DCR.
-- `tests/unit/tokens.test.ts` — tamper/expiração/aud/iss.
-- `tests/unit/logger.test.ts` — redação e truncamento.
-- `tests/integration/health.test.ts` — Origin 403, 413, 405.
+1. **Aceitação e Licença**: este software é distribuído sob a licença MIT, "no estado em que se encontra" (*as-is*), sem garantias expressas ou implícitas.
+2. **Não Afiliação**: `chatgpt-anki-plugin` é um projeto independente e não é afiliado, endossado ou mantido pela Ankitects Pty Ltd (Anki / AnkiWeb) nem pela OpenAI.
+3. **Uso Responsável e Conformidade com o AnkiWeb**: o usuário concorda em utilizar a integração por meio do AnkiConnect local / ponte autorizada, respeitando integralmente os [Termos de Serviço do AnkiWeb](https://ankiweb.net/account/terms) e as Políticas de Uso da OpenAI.
+4. **Backup da Coleção**: embora operações destrutivas (`delete_deck`, `delete_note`) exijam confirmação explícita (`confirm: true`), o usuário é responsável por manter backups regulares de sua coleção Anki (`Arquivo → Exportar → Pacote de Coleção do Anki (.colpkg)`).

@@ -1,152 +1,95 @@
 import { z } from 'zod';
 
-export const DEV_TOKEN_SECRET = 'dev-only-secret-change-me-0123456789abcdef';
-
-const csv = z
-  .string()
-  .transform((value) =>
-    value
-      .split(',')
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0),
-  );
-
-const spaceList = z
-  .string()
-  .transform((value) => value.split(/\s+/).filter((item) => item.length > 0));
-
-const boolFromEnv = (defaultValue: boolean) =>
-  z
-    .string()
-    .optional()
-    .transform((value) =>
-      value === undefined ? defaultValue : value.trim().toLowerCase() === 'true',
-    );
-
-const ConfigSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(8080),
-  HOST: z.string().default('0.0.0.0'),
-  PUBLIC_BASE_URL: z.string().url().default('http://localhost:8080'),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  ANKI_BACKEND: z.enum(['connect', 'mock']).default('connect'),
-  ANKI_CONNECT_URL: z.string().url().default('http://127.0.0.1:8765'),
-  ANKI_CONNECT_API_KEY: z
-    .string()
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined)),
-  ANKI_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
-  TOKEN_SECRET: z.string().min(32).default(DEV_TOKEN_SECRET),
-  TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
-  OAUTH_ISSUER: z
-    .string()
-    .url()
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined)),
-  OAUTH_CLIENT_ID: z.string().default('chatgpt'),
-  OAUTH_CLIENT_SECRET: z
-    .string()
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined)),
-  OAUTH_ALLOW_DCR: boolFromEnv(true),
-  OAUTH_ALLOWED_REDIRECT_URIS: csv.default(
-    'https://chatgpt.com/connector_platform_oauth_redirect,http://localhost:3000/callback',
-  ),
-  DEFAULT_SCOPE: spaceList.default('anki:read anki:write anki:review'),
-  AUTH_REQUIRED: boolFromEnv(true),
-  MCP_DEV_TOKEN: z
-    .string()
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined)),
-  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
-  MAX_BODY_BYTES: z.coerce.number().int().positive().default(1_048_576),
-  ALLOWED_ORIGINS: csv.default('https://chatgpt.com,https://chat.openai.com'),
-});
-
-export interface AnkiConfig {
-  backend: 'connect' | 'mock';
-  url: string;
-  apiKey?: string;
-  timeoutMs: number;
-}
-
-export interface AuthConfig {
-  tokenSecret: string;
-  tokenTtlSeconds: number;
-  clientId: string;
-  clientSecret?: string;
-  allowDcr: boolean;
-  allowedRedirectUris: string[];
-  defaultScopes: string[];
-  required: boolean;
-  devToken?: string;
-}
+export type AnkiBackendMode = 'ankiconnect' | 'bridge' | 'memory';
 
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   host: string;
   publicBaseUrl: string;
-  issuer: string;
-  audience: string;
-  logLevel: 'debug' | 'info' | 'warn' | 'error';
-  anki: AnkiConfig;
-  auth: AuthConfig;
-  limits: { ratePerMinute: number; maxBodyBytes: number };
-  allowedOrigins: string[];
+  ankiBackend: AnkiBackendMode;
+  ankiConnectUrl: string;
+  ankiConnectApiKey?: string;
+  ankiConnectTimeoutMs: number;
+  ankiReadOnly: boolean;
+  oauthJwtSecret: string;
+  oauthIssuer: string;
+  oauthAccessTokenTtlSeconds: number;
+  oauthAuthorizePin: string;
+  mcpAllowUnauthenticated: boolean;
+  bridgeSharedToken?: string;
 }
 
-function normalizeUrl(value: string): string {
-  return value.replace(/\/+$/, '');
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().min(0).max(65535).default(3000),
+  HOST: z.string().min(1).default('127.0.0.1'),
+  PUBLIC_BASE_URL: z.string().url().optional(),
+  ANKI_BACKEND: z.enum(['ankiconnect', 'bridge', 'memory']).default('ankiconnect'),
+  ANKICONNECT_URL: z.string().url().default('http://127.0.0.1:8765'),
+  ANKICONNECT_API_KEY: z.string().optional(),
+  ANKICONNECT_TIMEOUT_MS: z.coerce.number().int().min(200).max(60000).default(8000),
+  ANKI_READ_ONLY: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
+  OAUTH_JWT_SECRET: z.string().min(16).default('dev-only-jwt-secret-key-at-least-32-chars!!'),
+  OAUTH_ISSUER: z.string().url().optional(),
+  OAUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(86400).default(3600),
+  OAUTH_AUTHORIZE_PIN: z.string().min(4).default('anki-dev-pin'),
+  MCP_ALLOW_UNAUTHENTICATED: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
+  BRIDGE_SHARED_TOKEN: z.string().optional(),
+});
+
+export function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  return normalized === '127.0.0.1' || normalized === 'localhost' || normalized === '::1';
+}
+
+export function assertHttpSecurity(config: AppConfig): void {
+  if (config.mcpAllowUnauthenticated && !isLoopbackHost(config.host)) {
+    throw new Error(
+      `Security violation: MCP_ALLOW_UNAUTHENTICATED=1 is only permitted on loopback hosts (got HOST=${config.host}).`,
+    );
+  }
+  if (
+    config.nodeEnv === 'production' &&
+    (config.oauthJwtSecret.includes('dev-only') ||
+      config.oauthJwtSecret.includes('replace-with') ||
+      config.oauthJwtSecret.length < 32)
+  ) {
+    throw new Error(
+      'Security violation: OAUTH_JWT_SECRET must be a strong secret (>= 32 chars) when NODE_ENV=production.',
+    );
+  }
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const parsed = ConfigSchema.safeParse(env);
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
-      .join('\n');
-    throw new Error(`Invalid environment configuration:\n${issues}\nSee .env.example for reference values.`);
-  }
-  const cfg = parsed.data;
+  const parsed = envSchema.parse(env);
+  const publicBaseUrl = (parsed.PUBLIC_BASE_URL ?? `http://${parsed.HOST}:${parsed.PORT}`).replace(/\/+$/, '');
+  const oauthIssuer = (parsed.OAUTH_ISSUER ?? publicBaseUrl).replace(/\/+$/, '');
 
-  if (cfg.NODE_ENV === 'production' && cfg.TOKEN_SECRET === DEV_TOKEN_SECRET) {
-    throw new Error(
-      'TOKEN_SECRET must be set to a strong random value in production (generate one with `openssl rand -base64 48`).',
-    );
-  }
-
-  const publicBaseUrl = normalizeUrl(cfg.PUBLIC_BASE_URL);
-
-  return {
-    nodeEnv: cfg.NODE_ENV,
-    port: cfg.PORT,
-    host: cfg.HOST,
+  const config: AppConfig = {
+    nodeEnv: parsed.NODE_ENV,
+    port: parsed.PORT,
+    host: parsed.HOST,
     publicBaseUrl,
-    issuer: normalizeUrl(cfg.OAUTH_ISSUER ?? publicBaseUrl),
-    audience: publicBaseUrl,
-    logLevel: cfg.LOG_LEVEL,
-    anki: {
-      backend: cfg.ANKI_BACKEND,
-      url: cfg.ANKI_CONNECT_URL,
-      apiKey: cfg.ANKI_CONNECT_API_KEY,
-      timeoutMs: cfg.ANKI_TIMEOUT_MS,
-    },
-    auth: {
-      tokenSecret: cfg.TOKEN_SECRET,
-      tokenTtlSeconds: cfg.TOKEN_TTL_SECONDS,
-      clientId: cfg.OAUTH_CLIENT_ID,
-      clientSecret: cfg.OAUTH_CLIENT_SECRET,
-      allowDcr: cfg.OAUTH_ALLOW_DCR,
-      allowedRedirectUris: cfg.OAUTH_ALLOWED_REDIRECT_URIS,
-      defaultScopes: cfg.DEFAULT_SCOPE,
-      required: cfg.AUTH_REQUIRED,
-      devToken: cfg.MCP_DEV_TOKEN,
-    },
-    limits: {
-      ratePerMinute: cfg.RATE_LIMIT_PER_MINUTE,
-      maxBodyBytes: cfg.MAX_BODY_BYTES,
-    },
-    allowedOrigins: cfg.ALLOWED_ORIGINS,
+    ankiBackend: parsed.ANKI_BACKEND,
+    ankiConnectUrl: parsed.ANKICONNECT_URL,
+    ankiConnectApiKey: parsed.ANKICONNECT_API_KEY || undefined,
+    ankiConnectTimeoutMs: parsed.ANKICONNECT_TIMEOUT_MS,
+    ankiReadOnly: Boolean(parsed.ANKI_READ_ONLY),
+    oauthJwtSecret: parsed.OAUTH_JWT_SECRET,
+    oauthIssuer,
+    oauthAccessTokenTtlSeconds: parsed.OAUTH_ACCESS_TOKEN_TTL_SECONDS,
+    oauthAuthorizePin: parsed.OAUTH_AUTHORIZE_PIN,
+    mcpAllowUnauthenticated: Boolean(parsed.MCP_ALLOW_UNAUTHENTICATED),
+    bridgeSharedToken: parsed.BRIDGE_SHARED_TOKEN || undefined,
   };
+
+  assertHttpSecurity(config);
+  return config;
 }

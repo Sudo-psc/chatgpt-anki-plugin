@@ -1,225 +1,316 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ALL_TOOLS, getTool, inputJsonSchema, outputJsonSchema, toolNames } from '../../src/tools/registry.js';
-import { TOOL_SCOPES, type ErrorCode } from '../../src/tools/types.js';
-import { ALL_SCOPES, callTool, obtainToken, startTestApp, type TestApp } from '../helpers/test-app.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { describe, expect, it } from 'vitest';
+import { InMemoryAnkiAdapter } from '../../src/anki/memory-adapter.js';
+import { loadConfig } from '../../src/infra/config.js';
+import { createMcpServerInstance } from '../../src/mcp/server.js';
+import { ALL_OAUTH_SCOPES, REGISTERED_TOOL_NAMES } from '../../src/tools/index.js';
 
-/** C5: the exact mandated tool list (13) plus the 2 documented extension tools. */
-const MANDATED_TOOLS = [
-  'list_decks',
-  'get_deck',
-  'create_deck',
-  'update_deck',
-  'delete_deck',
-  'search_cards',
-  'get_card',
-  'create_note',
-  'update_note',
-  'delete_note',
-  'get_due_cards',
-  'submit_review',
-  'get_stats',
-];
-const EXTENDED_TOOLS = ['manage_tags', 'update_model_templates'];
-const READ_ONLY_TOOLS = ['list_decks', 'get_deck', 'search_cards', 'get_card', 'get_due_cards', 'get_stats'];
-const DESTRUCTIVE_TOOLS = ['delete_deck', 'delete_note', 'manage_tags', 'update_model_templates'];
-const KNOWN_ERROR_CODES: ErrorCode[] = [
-  'VALIDATION_ERROR',
-  'NOT_FOUND',
-  'CONFLICT',
-  'FORBIDDEN',
-  'RATE_LIMITED',
-  'ANKI_UNAVAILABLE',
-  'ANKI_ERROR',
-  'INTERNAL',
-];
-
-describe('tool registry contract (C5/C6)', () => {
-  it('exposes exactly the mandated tools plus the documented extensions', () => {
-    const names = [...toolNames()].sort();
-    expect(names).toEqual([...MANDATED_TOOLS, ...EXTENDED_TOOLS].sort());
-    for (const mandated of MANDATED_TOOLS) {
-      expect(getTool(mandated), `mandated tool ${mandated} must be registered`).toBeDefined();
-    }
+async function createConnectedTestPair(options?: {
+  readOnly?: boolean;
+  scopes?: ReadonlySet<string>;
+}) {
+  const anki = new InMemoryAnkiAdapter(true);
+  const config = loadConfig({
+    NODE_ENV: 'test',
+    ANKI_BACKEND: 'memory',
+    ANKI_READ_ONLY: options?.readOnly ? '1' : '0',
+  });
+  const server = createMcpServerInstance({
+    anki,
+    config,
+    grantedScopes: options?.scopes ?? new Set(ALL_OAUTH_SCOPES),
   });
 
-  it('every tool has title, description, valid scope and sane annotations', () => {
-    for (const tool of ALL_TOOLS) {
-      expect(tool.title.length, tool.name).toBeGreaterThan(2);
-      expect(tool.description.length, tool.name).toBeGreaterThan(40);
-      expect(TOOL_SCOPES).toContain(tool.scope);
-      if (READ_ONLY_TOOLS.includes(tool.name)) {
-        expect(tool.annotations.readOnlyHint, `${tool.name} must be readOnlyHint`).toBe(true);
-      }
-      if (DESTRUCTIVE_TOOLS.includes(tool.name)) {
-        expect(tool.annotations.destructiveHint, `${tool.name} must be destructiveHint`).toBe(true);
-      }
+  const client = new Client({ name: 'contract-test-client', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+  return { client, server, anki };
+}
+
+describe('MCP Tools Contract Suite — C5 & C6 (`tests/contract/tools.contract.test.ts`)', () => {
+  it('registers all 13 required tools with valid JSON Schema, descriptions, and annotations', async () => {
+    const { client, server } = await createConnectedTestPair();
+    const { tools } = await client.listTools();
+
+    const names = tools.map((t) => t.name);
+    for (const expectedName of REGISTERED_TOOL_NAMES) {
+      expect(names).toContain(expectedName);
     }
+    expect(tools).toHaveLength(13);
+
+    for (const tool of tools) {
+      expect(tool.description && tool.description.length > 15).toBe(true);
+      expect(tool.inputSchema.type).toBe('object');
+      expect(tool.annotations).toBeDefined();
+      expect(typeof tool.annotations?.readOnlyHint).toBe('boolean');
+      expect(typeof tool.annotations?.destructiveHint).toBe('boolean');
+      expect(typeof tool.annotations?.idempotentHint).toBe('boolean');
+      expect(tool.annotations?.openWorldHint).toBe(false);
+    }
+
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toEqual([
+      'ui://widget/deck-browser.html',
+      'ui://widget/review-session.html',
+    ]);
+
+    await client.close();
+    await server.close();
   });
 
-  it('scopes are assigned per operation as documented', () => {
-    const expected: Record<string, string> = {
-      list_decks: 'anki:read',
-      get_deck: 'anki:read',
-      create_deck: 'anki:write',
-      update_deck: 'anki:write',
-      delete_deck: 'anki:write',
-      search_cards: 'anki:read',
-      get_card: 'anki:read',
-      create_note: 'anki:write',
-      update_note: 'anki:write',
-      delete_note: 'anki:write',
-      get_due_cards: 'anki:review',
-      submit_review: 'anki:review',
-      get_stats: 'anki:read',
-      manage_tags: 'anki:write',
-      update_model_templates: 'anki:admin',
-    };
-    for (const tool of ALL_TOOLS) {
-      expect(tool.scope, tool.name).toBe(expected[tool.name]);
-    }
+  it('executes happy-path and structured error contracts for all 13 tools', async () => {
+    const { client, server } = await createConnectedTestPair();
+
+    // 1. list_decks
+    const listRes = await client.callTool({ name: 'list_decks', arguments: {} });
+    expect(listRes.isError).toBeFalsy();
+    const listStruct = listRes.structuredContent as { totalDecks: number; decks: Array<{ name: string }> };
+    expect(listStruct.totalDecks).toBeGreaterThanOrEqual(3);
+
+    // 2. get_deck (happy + not found)
+    const getDeckRes = await client.callTool({
+      name: 'get_deck',
+      arguments: { deckName: 'Medicina::Cardiologia', sampleLimit: 5 },
+    });
+    expect(getDeckRes.isError).toBeFalsy();
+
+    const getDeckErr = await client.callTool({
+      name: 'get_deck',
+      arguments: { deckName: 'Deck::Inexistente' },
+    });
+    expect(getDeckErr.isError).toBe(true);
+    expect((getDeckErr.structuredContent as { error: { code: string } }).error.code).toBe('DECK_NOT_FOUND');
+
+    // 3. create_deck (idempotent)
+    const createDeck1 = await client.callTool({
+      name: 'create_deck',
+      arguments: { deckName: 'Concursos::Direito Constitucional' },
+    });
+    expect((createDeck1.structuredContent as { created: boolean }).created).toBe(true);
+
+    const createDeck2 = await client.callTool({
+      name: 'create_deck',
+      arguments: { deckName: 'Concursos::Direito Constitucional' },
+    });
+    expect((createDeck2.structuredContent as { created: boolean }).created).toBe(false);
+
+    // 4. create_note (happy + duplicate check)
+    const createNoteRes = await client.callTool({
+      name: 'create_note',
+      arguments: {
+        deckName: 'Concursos::Direito Constitucional',
+        modelName: 'Basic',
+        fields: {
+          Front: 'Quais são os fundamentos da República Federativa do Brasil (art. 1º CF)?',
+          Back: 'SO-CI-DI-VA-PLU: Soberania, Cidadania, Dignidade da pessoa humana, Valores sociais do trabalho e da livre iniciativa, Pluralismo político.',
+        },
+        tags: ['cf88', 'fundamentos'],
+      },
+    });
+    expect(createNoteRes.isError).toBeFalsy();
+    const createdNoteId = (createNoteRes.structuredContent as { noteId: number }).noteId;
+    expect(createdNoteId).toBeGreaterThan(0);
+
+    const dupNoteRes = await client.callTool({
+      name: 'create_note',
+      arguments: {
+        deckName: 'Concursos::Direito Constitucional',
+        modelName: 'Basic',
+        fields: {
+          Front: 'Quais são os fundamentos da República Federativa do Brasil (art. 1º CF)?',
+          Back: 'Duplicado',
+        },
+      },
+    });
+    expect(dupNoteRes.isError).toBe(true);
+    expect((dupNoteRes.structuredContent as { error: { code: string } }).error.code).toBe('DUPLICATE_NOTE');
+
+    // 5. search_cards (happy + invalid query)
+    const searchRes = await client.callTool({
+      name: 'search_cards',
+      arguments: { query: 'tag:cf88', limit: 10, offset: 0 },
+    });
+    expect(searchRes.isError).toBeFalsy();
+    const searchedCards = (searchRes.structuredContent as { cards: Array<{ cardId: number; noteId: number }> }).cards;
+    expect(searchedCards).toHaveLength(1);
+    const createdCardId = searchedCards[0]!.cardId;
+
+    const badSearch = await client.callTool({
+      name: 'search_cards',
+      arguments: { query: 'deck:"Unclosed quote' },
+    });
+    expect(badSearch.isError).toBe(true);
+    expect((badSearch.structuredContent as { error: { code: string } }).error.code).toBe('INVALID_SEARCH_QUERY');
+
+    // 6. get_card (happy + not found)
+    const getCardRes = await client.callTool({
+      name: 'get_card',
+      arguments: { cardId: createdCardId, includeReviews: true },
+    });
+    expect(getCardRes.isError).toBeFalsy();
+
+    const missingCard = await client.callTool({
+      name: 'get_card',
+      arguments: { cardId: 9999999 },
+    });
+    expect(missingCard.isError).toBe(true);
+    expect((missingCard.structuredContent as { error: { code: string } }).error.code).toBe('CARD_NOT_FOUND');
+
+    // 7. update_note (happy + invalid empty update)
+    const updateNoteRes = await client.callTool({
+      name: 'update_note',
+      arguments: {
+        noteId: createdNoteId,
+        fields: { Back: 'SO-CI-DI-VA-PLU (Art. 1º da CF/88)' },
+        addTags: ['revisado'],
+      },
+    });
+    expect(updateNoteRes.isError).toBeFalsy();
+
+    const emptyUpdateNote = await client.callTool({
+      name: 'update_note',
+      arguments: { noteId: createdNoteId },
+    });
+    expect(emptyUpdateNote.isError).toBe(true);
+    expect((emptyUpdateNote.structuredContent as { error: { code: string } }).error.code).toBe('INVALID_ARGUMENTS');
+
+    // 8. get_due_cards
+    const dueRes = await client.callTool({
+      name: 'get_due_cards',
+      arguments: { deckName: 'Medicina::Cardiologia', limit: 10, includeNew: true },
+    });
+    expect(dueRes.isError).toBeFalsy();
+    const dueCards = (dueRes.structuredContent as { cards: Array<{ cardId: number }> }).cards;
+    expect(dueCards.length).toBeGreaterThan(0);
+
+    // 9. submit_review
+    const reviewRes = await client.callTool({
+      name: 'submit_review',
+      arguments: { cardId: dueCards[0]!.cardId, rating: 'good' },
+    });
+    expect(reviewRes.isError).toBeFalsy();
+    expect((reviewRes.structuredContent as { ratingLabel: string }).ratingLabel).toBe('Good');
+
+    // 10. get_stats (global + scoped to deckName)
+    const statsRes = await client.callTool({
+      name: 'get_stats',
+      arguments: { days: 7 },
+    });
+    expect(statsRes.isError).toBeFalsy();
+    expect((statsRes.structuredContent as { reviewedToday: number }).reviewedToday).toBeGreaterThanOrEqual(5);
+
+    const scopedStatsRes = await client.callTool({
+      name: 'get_stats',
+      arguments: { deckName: 'Medicina::Cardiologia', days: 3 },
+    });
+    expect(scopedStatsRes.isError).toBeFalsy();
+
+    // Global get_due_cards (no deckName) & create_note with no tags + update_note with empty tags
+    const globalDueRes = await client.callTool({
+      name: 'get_due_cards',
+      arguments: { limit: 5 },
+    });
+    expect(globalDueRes.isError).toBeFalsy();
+
+    const untaggedNoteRes = await client.callTool({
+      name: 'create_note',
+      arguments: {
+        deckName: 'Default',
+        fields: { Front: 'Nota sem tag', Back: 'Verso sem tag' },
+      },
+    });
+    const untaggedNoteId = (untaggedNoteRes.structuredContent as { noteId: number }).noteId;
+    await client.callTool({
+      name: 'update_note',
+      arguments: { noteId: untaggedNoteId, tags: [] },
+    });
+
+    // 11. update_deck (rename deck)
+    const updateDeckRes = await client.callTool({
+      name: 'update_deck',
+      arguments: {
+        deckName: 'Concursos::Direito Constitucional',
+        newName: 'Concursos::Direito Público',
+      },
+    });
+    expect(updateDeckRes.isError).toBeFalsy();
+    expect((updateDeckRes.structuredContent as { movedCardsCount: number }).movedCardsCount).toBe(1);
+
+    // 12. delete_note (requires confirm=true)
+    const delNoteUnconfirmed = await client.callTool({
+      name: 'delete_note',
+      arguments: { noteIds: [createdNoteId], confirm: false },
+    });
+    expect(delNoteUnconfirmed.isError).toBe(true);
+    expect((delNoteUnconfirmed.structuredContent as { error: { code: string } }).error.code).toBe(
+      'CONFIRMATION_REQUIRED',
+    );
+
+    const delNoteConfirmed = await client.callTool({
+      name: 'delete_note',
+      arguments: { noteIds: [createdNoteId, untaggedNoteId], confirm: true },
+    });
+    expect(delNoteConfirmed.isError).toBeFalsy();
+
+    // 13. delete_deck (protects Default & requires confirm=true)
+    const delDeckUnconfirmed = await client.callTool({
+      name: 'delete_deck',
+      arguments: { deckName: 'Concursos::Direito Público', confirm: false },
+    });
+    expect(delDeckUnconfirmed.isError).toBe(true);
+
+    const delDefault = await client.callTool({
+      name: 'delete_deck',
+      arguments: { deckName: 'Default', confirm: true },
+    });
+    expect(delDefault.isError).toBe(true);
+    expect((delDefault.structuredContent as { error: { code: string } }).error.code).toBe('PROTECTED_DECK');
+
+    const delDeckConfirmed = await client.callTool({
+      name: 'delete_deck',
+      arguments: { deckName: 'Concursos::Direito Público', confirm: true },
+    });
+    expect(delDeckConfirmed.isError).toBeFalsy();
+
+    await client.close();
+    await server.close();
   });
 
-  it('input schemas are strict JSON Schema objects', () => {
-    for (const tool of ALL_TOOLS) {
-      const schema = inputJsonSchema(tool);
-      expect(schema.type, tool.name).toBe('object');
-      expect(schema.additionalProperties, tool.name).toBe(false);
-      expect(schema.properties, tool.name).toBeTypeOf('object');
-      if (schema.required !== undefined) expect(Array.isArray(schema.required), tool.name).toBe(true);
-    }
-    expect(inputJsonSchema(getTool('get_card') as never).required).toEqual(['card_id']);
-    expect(inputJsonSchema(getTool('delete_deck') as never).required).toEqual(['name', 'confirm']);
-    // Fields with defaults must not be required (ChatGPT relies on optionality).
-    expect(inputJsonSchema(getTool('search_cards') as never).required).toEqual(['query']);
-    expect(inputJsonSchema(getTool('get_due_cards') as never).required).toBeUndefined();
-    expect(inputJsonSchema(getTool('list_decks') as never).required).toBeUndefined();
+  it('blocks all write/review/delete tools when ANKI_READ_ONLY=1', async () => {
+    const { client, server } = await createConnectedTestPair({ readOnly: true });
+
+    const readRes = await client.callTool({ name: 'list_decks', arguments: {} });
+    expect(readRes.isError).toBeFalsy();
+
+    const writeRes = await client.callTool({
+      name: 'create_deck',
+      arguments: { deckName: 'Bloqueado' },
+    });
+    expect(writeRes.isError).toBe(true);
+    expect((writeRes.structuredContent as { error: { code: string } }).error.code).toBe('READ_ONLY_MODE');
+
+    await client.close();
+    await server.close();
   });
 
-  it('output schemas are JSON Schema objects', () => {
-    for (const tool of ALL_TOOLS) {
-      const schema = outputJsonSchema(tool);
-      expect(schema.type, tool.name).toBe('object');
-      expect(schema.properties, tool.name).toBeTypeOf('object');
-    }
-  });
-});
+  it('enforces OAuth scopes per operation (anki:read vs anki:write / anki:delete)', async () => {
+    const { client, server } = await createConnectedTestPair({
+      scopes: new Set(['anki:read']),
+    });
 
-describe('tool contracts against a live server (C6)', () => {
-  let app: TestApp;
-  let token: string;
+    const allowedRead = await client.callTool({ name: 'list_decks', arguments: {} });
+    expect(allowedRead.isError).toBeFalsy();
 
-  beforeAll(async () => {
-    app = await startTestApp();
-    token = await obtainToken(app.baseUrl, { scope: ALL_SCOPES });
-  });
+    const deniedWrite = await client.callTool({
+      name: 'create_deck',
+      arguments: { deckName: 'SemEscopo' },
+    });
+    expect(deniedWrite.isError).toBe(true);
+    expect((deniedWrite.structuredContent as { error: { code: string } }).error.code).toBe('INSUFFICIENT_SCOPE');
 
-  afterAll(async () => {
-    await app.close();
-  });
-
-  /** Canonical, side-effect-ordered invocation per tool. */
-  async function canonicalCall(name: string): Promise<Record<string, unknown> | null> {
-    const prepare = async (): Promise<Record<string, unknown>> => {
-      const deck = await callTool(app.baseUrl, token, 'create_deck', { name: 'Contrato' });
-      expect(deck.isError).toBe(false);
-      const note = await callTool(app.baseUrl, token, 'create_note', {
-        deck: 'Contrato',
-        model: 'Basic',
-        fields: { Front: 'Pergunta de contrato', Back: 'Resposta de contrato' },
-        tags: ['contrato'],
-      });
-      expect(note.isError).toBe(false);
-      const search = await callTool(app.baseUrl, token, 'search_cards', { query: 'tag:contrato' });
-      const card = (search.structuredContent?.cards as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
-      return { noteId: note.structuredContent?.note_id as number, cardId: card?.card_id as number };
-    };
-
-    switch (name) {
-      case 'list_decks':
-        return (await callTool(app.baseUrl, token, name, {})).structuredContent;
-      case 'get_deck':
-        return (await callTool(app.baseUrl, token, name, { name: 'Default' })).structuredContent;
-      case 'create_deck':
-        return (await callTool(app.baseUrl, token, name, { name: 'Contrato' })).structuredContent;
-      case 'update_deck':
-        return (await callTool(app.baseUrl, token, name, { name: 'Contrato', new_name: 'Contrato2' })).structuredContent;
-      case 'delete_deck': {
-        await callTool(app.baseUrl, token, 'create_deck', { name: 'ParaDeletar' });
-        return (await callTool(app.baseUrl, token, name, { name: 'ParaDeletar', confirm: true })).structuredContent;
-      }
-      case 'search_cards':
-        return (await callTool(app.baseUrl, token, name, { query: 'is:due' })).structuredContent;
-      case 'get_card': {
-        const due = await callTool(app.baseUrl, token, 'get_due_cards', { limit: 1 });
-        const cardId = (due.structuredContent?.cards as Array<Record<string, unknown>>)[0]?.card_id as number;
-        return (await callTool(app.baseUrl, token, name, { card_id: cardId })).structuredContent;
-      }
-      case 'create_note':
-        return (await callTool(app.baseUrl, token, name, {
-          deck: 'Default',
-          model: 'Basic',
-          fields: { Front: 'Nota de contrato', Back: 'Resposta' },
-        })).structuredContent;
-      case 'update_note': {
-        const { noteId } = await prepare();
-        return (await callTool(app.baseUrl, token, name, { note_id: noteId, tags: ['contrato', 'ok'] })).structuredContent;
-      }
-      case 'delete_note': {
-        const created = await callTool(app.baseUrl, token, 'create_note', {
-          deck: 'Default',
-          model: 'Basic',
-          fields: { Front: 'Para deletar contrato', Back: 'x' },
-        });
-        return (await callTool(app.baseUrl, token, name, {
-          note_ids: [created.structuredContent?.note_id as number],
-          confirm: true,
-        })).structuredContent;
-      }
-      case 'get_due_cards':
-        return (await callTool(app.baseUrl, token, name, {})).structuredContent;
-      case 'submit_review': {
-        const due = await callTool(app.baseUrl, token, 'get_due_cards', { limit: 1 });
-        const cardId = (due.structuredContent?.cards as Array<Record<string, unknown>>)[0]?.card_id as number;
-        return (await callTool(app.baseUrl, token, name, { card_id: cardId, ease: 'hard' })).structuredContent;
-      }
-      case 'get_stats':
-        return (await callTool(app.baseUrl, token, name, {})).structuredContent;
-      case 'manage_tags':
-        return (await callTool(app.baseUrl, token, name, { action: 'list' })).structuredContent;
-      case 'update_model_templates':
-        return (await callTool(app.baseUrl, token, name, { model: 'Basic', css: '.card{}' })).structuredContent;
-      default:
-        throw new Error(`no canonical call defined for ${name}`);
-    }
-  }
-
-  it('every tool output validates against its declared output schema', async () => {
-    for (const tool of ALL_TOOLS) {
-      const result = await canonicalCall(tool.name);
-      expect(result, tool.name).not.toBeNull();
-      const parsed = tool.outputSchema.safeParse(result);
-      if (!parsed.success) {
-        throw new Error(
-          `output of ${tool.name} does not match its schema: ${JSON.stringify(parsed.error.issues)}`,
-        );
-      }
-    }
-  });
-
-  it('every error payload uses a documented code, message and hint', async () => {
-    const scenarios: Array<{ name: string; args: Record<string, unknown> }> = [
-      { name: 'delete_deck', args: { name: 'Default', confirm: false } },
-      { name: 'get_deck', args: { name: 'NaoExiste' } },
-      { name: 'update_deck', args: { name: 'Default', new_name: 'Estudos' } },
-      { name: 'update_note', args: { note_id: 1 } },
-    ];
-    for (const scenario of scenarios) {
-      const result = await callTool(app.baseUrl, token, scenario.name, scenario.args);
-      expect(result.isError, scenario.name).toBe(true);
-      const code = result.payload?.code as ErrorCode;
-      expect(KNOWN_ERROR_CODES, `${scenario.name} returned code ${code}`).toContain(code);
-      expect(typeof result.payload?.message).toBe('string');
-      expect(result.payload?.hint).toBeTruthy();
-    }
+    await client.close();
+    await server.close();
   });
 });

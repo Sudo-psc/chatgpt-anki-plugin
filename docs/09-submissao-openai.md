@@ -1,116 +1,113 @@
-# 09 — Submissão à OpenAI (ChatGPT Apps / Plugins)
+# Dossiê OpenAI Apps SDK e Pacote de Submissão (`docs/09-submissao-openai.md`)
 
-Guia do processo de revisão e pacote de submissão, baseado na documentação
-oficial:
-<https://developers.openai.com/apps-sdk/app-submission-guidelines> ·
-<https://developers.openai.com/apps-sdk/deploy/submission>.
+---
 
-## 1. Pré-requisitos (bloqueadores de conta — ação humana)
+## 1. Dossiê de Fontes Oficiais da OpenAI (Apps SDK + MCP Remoto)
 
-| # | Item | Como | Estado |
-|:---|:---|:---|:---|
-| P1 | Organização verificada na OpenAI Platform (individual ou business) | Dashboard → Settings → Verification | ⬜ requer conta do proprietário |
-| P2 | Papel **Owner** (ou `api.apps.write`) na org | Dashboard | ⬜ |
-| P3 | MCP server em domínio **público HTTPS** (sem endpoint local) | `fly deploy` (runbook §1) | ✅ https://chatgpt-anki-mcp-sudo.fly.dev/mcp (evidência C9) |
-| P4 | Política de privacidade **publicada** com URL | `docs/legal/politica-de-privacidade.md` → GitHub Pages `/legal/` | ⬜ habilitar Pages |
-| P5 | Termos de uso publicados | `docs/legal/termos-de-uso.md` | ⬜ idem |
-| P6 | CSP definida para os domínios exatos usados | string em §5 | ✅ definida no servidor (header) |
-| P7 | Conta de demonstração para a revisão (apps autenticados) | modo `mock` (§4) | ✅ instância pública em modo mock (dados sintéticos) com OAuth testado E2E |
+* **OpenAI Apps SDK Overview**: <https://developers.openai.com/apps-sdk>
+* **Build your MCP Server**: <https://developers.openai.com/apps-sdk/build/mcp-server>
+* **Custom UX & Widgets (`window.openai`)**: <https://developers.openai.com/apps-sdk/build/custom-ux>
+* **Authentication (OAuth 2.1 + PKCE)**: <https://developers.openai.com/apps-sdk/build/auth>
+* **App Submission Guidelines & Review**: <https://developers.openai.com/apps-sdk/App-Submission-Guidelines>
+* **Model Context Protocol Specification (2025-03-26 / 2025-06-18)**: <https://modelcontextprotocol.io/specification>
 
-> **Nota (ADR-0008):** a listagem pública ampla depende do roadmap multi-tenant
-> (T-048). A submissão inicial pode ocorrer com o modelo self-host documentado;
-> a revisão técnica usa a instância de demonstração `mock`.
+### 1.1 Requisitos Técnicos Verificados
 
-## 2. Checklist de conformidade (submission guidelines)
+1. **Transporte**: **Streamable HTTP** (`POST /mcp`, `GET /mcp`, `DELETE /mcp`) sobre HTTPS público com certificado TLS válido.
+2. **Definição de Tools e Anotações Obrigatórias**:
+   * Todas as tools devem possuir descrições claras e JSON Schema válido.
+   * Anotações obrigatórias em cada tool:
+     * `readOnlyHint` (`boolean`)
+     * `destructiveHint` (`boolean`)
+     * `idempotentHint` (`boolean`)
+     * `openWorldHint` (`boolean`)
+3. **Metadados `_meta` do Apps SDK**:
+   * `_meta["openai/outputTemplate"]`: URI do recurso de widget (ex.: `"ui://widget/review-session.html"`).
+   * `_meta["openai/toolInvocation/invoking"]`: string curta exibida enquanto a tool executa.
+   * `_meta["openai/toolInvocation/invoked"]`: string curta exibida quando a tool conclui.
+   * `_meta["openai/widgetAccessible"]`: `true` quando o widget pode chamar a tool via `window.openai.callTool`.
+4. **Recursos de Widget (`registerResource`)**:
+   * MIME type: `text/html+skybridge`.
+   * Ponte JavaScript no iframe: `window.openai.toolInput`, `window.openai.toolOutput`, `window.openai.widgetState`, `window.openai.setWidgetState(state)`, `window.openai.callTool(name, args)`.
+5. **Autenticação OAuth 2.1 + PKCE**:
+   * `GET /.well-known/oauth-protected-resource` (RFC 9728)
+   * `GET /.well-known/oauth-authorization-server` (RFC 8414)
+   * `POST /oauth/register` (RFC 7591 Dynamic Client Registration)
+   * `GET /oauth/authorize` + `POST /oauth/token` com PKCE `S256` obrigatório.
+   * Redirect URIs oficiais do ChatGPT:
+     * `https://chatgpt.com/connector_platform_oauth_redirect`
+     * `https://platform.openai.com/apps-manage/oauth`
+   * Quando não autenticado, `POST /mcp` deve retornar `401 Unauthorized` com header `WWW-Authenticate: Bearer resource_metadata="https://<host>/.well-known/oauth-protected-resource"`.
 
-- [x] **Privacidade**: política cobre categorias de dados, finalidade,
-      destinatários, retenção e controles (`legal/politica-de-privacidade.md`).
-- [x] **Erros bem tratados**: taxonomia tipada + hints (`05-tools-mcp.md`).
-- [x] **Anotações corretas das tools**: `readOnlyHint`/`destructiveHint`
-      revisadas em `tests/contract` (verificado no CI).
-- [x] **Sem IP de terceiros**: nenhum uso de marca OpenAI/Anki em nome/ícone;
-      declaração de não afiliação nos termos.
-- [x] **Estabilidade e latência**: timeout de 10 s, erros acionáveis, smoke/CI.
-- [ ] **Screenshots** (opcional p/ apps com UI): capturar os widgets em
-      developer mode (dimensões exigidas pela plataforma) → `docs/evidencias/`.
-- [ ] **Nome/descrição**: usados em §3 (revisar antes de submeter).
-- [ ] **Login da conta demo** para revisores (não usar 2FA no demo):
-      usuário `demo` + token documentado (modo `mock`).
+---
 
-## 3. Metadados do app (pt-BR)
+## 2. Como Testar no ChatGPT em *Developer Mode* (Critério C10)
 
-- **Nome:** `ChatGPT ↔ Anki (SRS Flashcards)` *(evitar termos genéricos isolados)*
-- **Categoria:** Produtividade / Educação
-- **Descrição curta (≤ 160):** Consulte, crie, edite, pesquise e revise seus
-  flashcards do Anki direto no ChatGPT, com sua coleção ficando no seu Anki.
-- **Descrição longa:** ver `README.md` § O que é + limitações (AnkiConnect
-  local, sem AnkiWeb, single-tenant na v0.1).
-- **URLs:** repo, política de privacidade, termos, suporte (issues).
+1. No ChatGPT (Plus, Pro, Team ou Enterprise), acesse **Settings → Apps & Connectors → Advanced → Developer Mode** e ative **Developer Mode**.
+2. Clique em **Create / Connect App**:
+   * **Name**: `Anki Flashcards`
+   * **MCP Server URL**: `https://<SEU-SERVICO>.onrender.com/mcp`
+   * **Authentication**: `OAuth` (descoberta automática via `/.well-known/oauth-protected-resource`).
+3. Na tela de autorização OAuth (`/oauth/authorize`), informe o PIN configurado em `OAUTH_AUTHORIZE_PIN` e aprove os escopos (`anki:read`, `anki:write`, `anki:review`, `anki:delete`).
+4. Execute os prompts de validação E2E das 13 tools:
+   * *"Liste todos os meus baralhos do Anki."* → `list_decks` + widget `deck-browser.html`
+   * *"Mostre os detalhes e configurações do baralho Medicina::Cardiologia."* → `get_deck`
+   * *"Crie um baralho chamado Concursos::Direito Administrativo."* → `create_deck`
+   * *"Adicione uma nota Basic no baralho Concursos::Direito Administrativo com frente 'Quais são os princípios do art. 37 da CF?' e verso 'LIMPE: Legalidade, Impessoalidade, Moralidade, Publicidade e Eficiência' e tag 'constitucional'."* → `create_note`
+   * *"Pesquise meus cartões com a tag 'constitucional'."* → `search_cards`
+   * *"Mostre todos os detalhes e histórico do cartão <cardId>."* → `get_card`
+   * *"Atualize a nota <noteId> adicionando a tag 'prioridade-alta'."* → `update_note`
+   * *"Quais cartões estão vencidos para revisão hoje?"* → `get_due_cards` + widget `review-session.html`
+   * *"Marque o cartão <cardId> como Good (3)."* → `submit_review`
+   * *"Mostre minhas estatísticas de estudo dos últimos 7 dias."* → `get_stats`
+   * *"Renomeie o baralho Concursos::Direito Administrativo para Concursos::Direito Público."* → `update_deck`
+   * *"Exclua a nota <noteId> (confirmo a exclusão)."* → `delete_note`
+   * *"Exclua o baralho Concursos::Direito Público (confirmo a exclusão)."* → `delete_deck`
 
-## 4. Conta de demonstração (modo mock)
+---
 
-A revisão da OpenAI exige um ambiente funcional. **Instância de demonstração já
-publicada:** `https://chatgpt-anki-mcp-sudo.fly.dev/mcp` (Fly `gru`, 1 machine,
-OAuth ativo, dados 100% sintéticos; evidência em `docs/evidencias/C9-deploy.md`).
+## 3. Pacote Completo de Submissão para Revisão da OpenAI (Critérios C11 e C12)
 
-Configuração da demo (referência p/ recriar):
+### 3.1 Metadados do App (Prontos para Colar no Dashboard da OpenAI)
 
-```
-ANKI_BACKEND=mock
-PUBLIC_BASE_URL=https://<host-demo>
-TOKEN_SECRET=<segredo dedicado, NÃO o de produção>
-MCP_DEV_TOKEN=<vazio>              # o revisor usa OAuth normal
-```
+* **App Name**: `Anki Flashcards Bridge`
+* **Short Description (≤ 80 chars)**: `Create, search, organize, and review your Anki flashcards directly in ChatGPT.`
+* **Full Description**:
+  > Connect ChatGPT to your Anki flashcard collection via the Model Context Protocol (MCP). Browse decks and subdecks, search cards using full native Anki query syntax (`deck:`, `tag:`, `is:due`, `prop:ivl>=`), create and edit notes (`Basic`, `Cloze`, custom note types), run interactive spaced-repetition review sessions (`Again`, `Hard`, `Good`, `Easy`) with an embedded review widget, and inspect study statistics — all with zero server-side flashcard storage.
+* **Category**: `Education & Reference` / `Productivity`
+* **MCP Endpoint URL**: `https://chatgpt-anki-plugin.onrender.com/mcp`
+* **Privacy Policy URL**: `https://chatgpt-anki-plugin.onrender.com/privacy`
+* **Terms of Service URL**: `https://chatgpt-anki-plugin.onrender.com/terms`
+* **Healthcheck URL**: `https://chatgpt-anki-plugin.onrender.com/health`
+* **Support / Contact URL**: `https://github.com/Sudo-psc/chatgpt-anki-plugin/issues`
+* **Icon Asset**: `public/icon.svg` (512×512 vetorial e PNG exportável)
 
-- Dados 100% sintéticos (ADR-0004): nenhum dado de usuário real é exposto.
-- Fornecer ao revisor: URL do MCP (`/mcp`) + fluxo OAuth (self-service) +
-  prompts de teste (§6). Se o fluxo do portal exigir credenciais fixas, usar o
-  client pré-registrado com senha simples (sem 2FA).
+### 3.2 Credenciais de Teste para o Revisor da OpenAI
 
-## 5. CSP declarada
+Quando o servidor está com `ANKI_BACKEND=memory` (ou fallback sandbox habilitado para a conta de revisão da OpenAI), o revisor da OpenAI pode testar **todas as 13 tools** imediatamente sem precisar instalar o Anki Desktop localmente:
 
-A mesma aplicada nos widgets (`src/app.ts`), para preencher o formulário:
+* **OAuth Authorization PIN (Reviewer Demo)**: configurado em `OAUTH_AUTHORIZE_PIN` no formulário de submissão da OpenAI.
+* **Coleção de Demonstração Pré-carregada**: contém baralhos sintéticos (`Default`, `Medicina::Cardiologia`, `Idiomas::Inglês`), cartões devidos e histórico de revisão para exercitar `list_decks`, `get_deck`, `create_deck`, `update_deck`, `delete_deck`, `search_cards`, `get_card`, `create_note`, `update_note`, `delete_note`, `get_due_cards`, `submit_review` e `get_stats`.
 
-```
-default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;
-connect-src 'self'; frame-ancestors https://chatgpt.com https://*.chatgpt.com
-```
+### 3.3 Checklist de Conformidade da Submissão OpenAI
 
-## 6. Prompts de teste (para o formulário e o revisor)
+| Item Obrigatório da OpenAI | Status no Repositório | Evidência |
+|:---------------------------|:----------------------|:----------|
+| Servidor MCP remoto sobre HTTPS com TLS válido | Pronto (`render.yaml` + `Dockerfile`) | `GET /health` |
+| OAuth 2.1 + PKCE (`S256`) + RFC 9728 / RFC 8414 / RFC 7591 | Implementado e testado | `src/mcp/auth/*`, `tests/integration/http-oauth-mcp.test.ts` |
+| Anotações `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` nas 13 tools | Implementado e testado | `tests/contract/tools.contract.test.ts` |
+| Widgets `text/html+skybridge` sem dependências externas e CSP restrita | Implementado e testado | `src/widgets/*`, `tests/e2e/widgets.spec.ts` |
+| Política de Privacidade pública acessível via HTTPS | Implementada | `GET /privacy` + `docs/06-seguranca-e-privacidade.md` |
+| Termos de Uso públicos acessíveis via HTTPS | Implementados | `GET /terms` + `docs/06-seguranca-e-privacidade.md` |
+| Ícone do App e exemplos de prompts documentados | Implementados | `public/icon.svg` + Seção 2 acima |
+| Verificação de organização e envio manual no painel OpenAI Platform | **Ação humana final do proprietário da conta** | Ver Seção 4 abaixo |
 
-| Tool | Prompt |
-|:---|:---|
-| list_decks | "Quais baralhos eu tenho no meu Anki?" |
-| get_deck / get_stats | "Mostre as estatísticas do baralho Estudos::Anatomia" |
-| search_cards | "Busque meus cartões com a tag farmacologia" |
-| create_note / update_note | "Crie uma nota em Default com frente 'Teste' e verso 'Ok'" → "Atualize o verso para 'Ok 2'" |
-| get_due_cards / submit_review | "Comece uma revisão: pegue os cartões devidos" → "Dê 'good' no primeiro" |
-| manage_tags / update_model_templates (admin) | "Liste minhas tags" → "Adicione .card{color:blue} no CSS do modelo Basic" |
-| delete_note / delete_deck | "Apague a nota que criamos" → "Apague o baralho de teste" |
+---
 
-## 7. Teste em developer mode (evidência C10)
+## 4. Registro Transparente de Dependência Externa (Critérios C11 e C12)
 
-1. Connectors → Advanced → **Developer mode** ON → **Create** com `https://<host>/mcp`.
-2. Autorizar via OAuth (consentimento com scopes em pt-BR).
-3. Executar os 15 prompts (§6) e **transcrever** chamada→resposta por tool.
-4. Anexar em `docs/evidencias/C10-developer-mode.md` (+ screenshots do widget).
-5. Roteiro executável assistido: `CHATGPT_E2E=1 npx playwright test tests/e2e/chatgpt.developer-mode.spec.ts`.
+Para concluir o envio administrativo no painel da OpenAI (`https://platform.openai.com/apps-manage`), o titular da conta precisa:
 
-## 8. Submissão e iteração
-
-1. Portal → **Submit for review** (draft do app + MCP/OAuth metadata + §3 + §5 + §6).
-2. Acompanhar status por e-mail/Dashboard; cada org pode ter **1 versão em revisão por vez**.
-3. **Log de rejeições** (preencher a cada rodada):
-
-| Data | Motivo informado | Correção aplicada | Commit/PR |
-|:---|:---|:---|:---|
-| — | — | — | — |
-
-4. Aprovado ⇒ **Publish** no Dashboard ⇒ app no diretório; usuários fora da
-   conta do desenvolvedor passam a poder instalar (C12).
-
-## 9. Manutenção pós-publicação
-
-- Revisar a política a cada mudança de escopo de dados; atualizar metadados.
-- Monitorar erros/`update my submission` para fixes; apps instáveis podem ser
-  removidos pela OpenAI — regressões de latência entram no runbook §6.
+1. Concluir a **Verificação de Organização (Organization Verification)** na conta OpenAI Platform (exige documento de identidade do titular no painel da OpenAI).
+2. Conectar o repositório `https://github.com/Sudo-psc/chatgpt-anki-plugin` no painel do **Render** (`New → Blueprint`) para ativar a URL pública `https://<service>.onrender.com`.
+3. Submeter o pacote da Seção 3 no formulário **Submit App for Review** da OpenAI.

@@ -2,78 +2,86 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'feat/**', 'fix/**', 'release/**']
   pull_request:
     branches: [main, develop]
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: lint • typecheck • test (coverage) • build
+  quality-and-test:
+    name: Lint, Typecheck, Tests & Coverage (>=80%)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Lint
         run: npm run lint
+
       - name: Typecheck
         run: npm run typecheck
-      - name: Tests with coverage gate (>=80% em src/tools e src/anki)
+
+      - name: Unit, Integration & Contract Tests with Coverage Gate (>=80%)
         run: npm run test:coverage
-      - name: Build
+
+      - name: Build production bundle
         run: npm run build
-      - name: Upload coverage report
-        if: always()
+
+      - name: Generate CycloneDX SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json
+
+      - name: Upload Coverage & SBOM Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
-          path: coverage/
-          retention-days: 14
+          name: quality-artifacts
+          path: |
+            coverage/
+            sbom.cdx.json
 
-  secrets-scan:
-    name: gitleaks (working tree + history)
+  e2e-widgets:
+    name: Playwright E2E (OpenAI Apps SDK Widgets)
+    runs-on: ubuntu-latest
+    needs: quality-and-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e
+
+  secret-scan:
+    name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # Binário oficial pinado (o gitleaks-action tem flakiness de "stderr is not empty").
-      - name: Install gitleaks v8.30.1
-        run: |
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
-            | sudo tar -xz -C /usr/local/bin gitleaks
-          gitleaks version
-      - name: Scan working tree
-        run: gitleaks dir . --config .gitleaks.toml --redact --no-banner
-      - name: Scan full git history
-        run: gitleaks git . --config .gitleaks.toml --redact --no-banner
 
-  sbom:
-    name: SBOM (syft/spdx)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --omit=dev
-      - uses: anchore/sbom-action@v0
-        with:
-          path: .
-          format: spdx-json
-          output-file: sbom.spdx.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.spdx.json
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
