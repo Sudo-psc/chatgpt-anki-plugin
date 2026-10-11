@@ -44,3 +44,29 @@ services:
       TOKEN_SECRET: 'demo-secret-0123456789abcdef0123456789abcdef'
       MCP_DEV_TOKEN: 'demo-token-change-me'
     restart: unless-stopped
+
+  # Microsserviço "AnkiWeb como API": Anki headless syncado à conta AnkiWeb +
+  # servidor MCP, tudo na mesma máquina. Ver docker/ankiweb-service/README.md.
+  ankiweb-service:
+    profiles: ['ankiweb']
+    build:
+      context: ..
+      dockerfile: docker/ankiweb-service/Dockerfile
+    ports:
+      - '8080:8080'
+    volumes:
+      - anki-data:/data
+    environment:
+      PORT: '8080'
+      HOST: '0.0.0.0'
+      PUBLIC_BASE_URL: '${PUBLIC_BASE_URL:-http://localhost:8080}'
+      LOG_LEVEL: '${LOG_LEVEL:-info}'
+      TOKEN_SECRET: '${TOKEN_SECRET:?defina TOKEN_SECRET}'
+      OWNER_PASSWORD: '${OWNER_PASSWORD:?defina OWNER_PASSWORD (mín. 12 caracteres)}'
+      ANKI_PROFILE: '${ANKI_PROFILE:-}'
+      SYNC_INTERVAL_SECONDS: '${SYNC_INTERVAL_SECONDS:-900}'
+      ANKI_CONNECT_API_KEY: '${ANKI_CONNECT_API_KEY:-}'
+    restart: unless-stopped
+
+volumes:
+  anki-data: {}

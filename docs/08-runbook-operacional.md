@@ -133,7 +133,26 @@ recomendados: `/ready` ≠ 200 por > 5 min (ver §6).
 | Por release | Atualizar CHANGELOG + `SERVER_VERSION`, tag SemVer, smoke pós-deploy |
 | Semestral | Revisar política de privacidade e escopos; revisar DCR/allowlist |
 
-## 8. Contatos
+## 8. Microsserviço AnkiWeb-as-API (`ankiweb-service`)
+
+Guia completo em `docker/ankiweb-service/README.md`. Resumo operacional:
+
+- **Deploy**: `fly deploy --config fly.ankiweb.toml` (app 1 GB always-on,
+  volume `anki_data` em `/data`). Secrets: `TOKEN_SECRET` + `OWNER_PASSWORD`.
+- **Perfil Anki**: enviar `Anki2` empacotado para `/data` (§3 do README) e
+  `fly apps restart`. Sem perfil: cria coleção nova (sem AnkiWeb).
+- **Sync**: `fly logs` → linhas `[sync <ts>]`. Falhou? `{"error": ...}` no log;
+  o loop tenta a cada `SYNC_INTERVAL_SECONDS`. Problemas típicos: sessão
+  expirada (trocar senha ⇒ reenviar perfil), full sync necessário (abrir o Anki
+  local e sincronizar manualmente antes do upload).
+- **Atualizar Anki**: bump `ANKI_VERSION`/`ANKI_CONNECT_COMMIT` no Dockerfile →
+  redeploy. O AnkiConnect do volume é re-sincronizado com o da imagem no boot.
+- **Rotação**: vazamento da chave de sync ⇒ trocar senha no AnkiWeb (invalida a
+  chave), reenviar perfil. Vazamento de `OWNER_PASSWORD` ⇒ rotacionar secret.
+- **Monitorar**: `/health` (liveness), `/ready` (AnkiConnect interno), e a
+  cadência dos logs de sync (alerta se > 3× o intervalo).
+
+## 9. Contatos
 
 - Segurança: philipe.saraiva.cruz@gmail.com (ver `SECURITY.md`).
 - Issues: <https://github.com/Sudo-psc/chatgpt-anki-plugin/issues>.
